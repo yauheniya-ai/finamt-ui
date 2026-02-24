@@ -1,7 +1,8 @@
 import { useRef, useState } from "react";
+import { Icon } from "@iconify/react";
 
 // ---------------------------------------------------------------------------
-// Types  (mirrors ReceiptData.to_dict() — everything is FLAT, no "extracted" wrapper)
+// Types
 // ---------------------------------------------------------------------------
 
 export type Address = {
@@ -32,51 +33,37 @@ export type ReceiptItem = {
 export type Receipt = {
   id:             string;
   receipt_type:   "purchase" | "sale";
-  vendor:         string | null;       // compat alias = counterparty.name
+  vendor:         string | null;
   counterparty:   Counterparty | null;
   receipt_number: string | null;
-  receipt_date:   string | null;       // "YYYY-MM-DD"
+  receipt_date:   string | null;
   total_amount:   number | null;
   vat_percentage: number | null;
   vat_amount:     number | null;
   net_amount:     number | null;
   category:       string;
   items:          ReceiptItem[];
-  pdf_url:        string | null;       // "/receipts/{id}/pdf"
+  pdf_url:        string | null;
   duplicate?:     boolean;
   message?:       string;
 };
 
 // ---------------------------------------------------------------------------
-// Shared metadata used by multiple components
+// Shared metadata
 // ---------------------------------------------------------------------------
 
 export const CATEGORY_META: Record<string, { label: string; icon: string }> = {
-  material:          { label: "Materials",  icon: "📦" },
-  equipment:         { label: "Equipment",  icon: "🖥️" },
-  software:          { label: "Software",   icon: "💾" },
-  internet:          { label: "Internet",   icon: "🌐" },
-  telecommunication: { label: "Telecom",    icon: "📱" },
-  travel:            { label: "Travel",     icon: "✈️" },
-  education:         { label: "Education",  icon: "📚" },
-  utilities:         { label: "Utilities",  icon: "⚡" },
-  insurance:         { label: "Insurance",  icon: "🛡️" },
-  taxes:             { label: "Taxes",      icon: "🏛️" },
-  other:             { label: "Other",      icon: "📄" },
-};
-
-export const CATEGORY_COLORS: Record<string, string> = {
-  material:          "bg-amber-500",
-  equipment:         "bg-amber-700",
-  software:          "bg-amber-400",
-  internet:          "bg-amber-300",
-  telecommunication: "bg-amber-600",
-  travel:            "bg-red-400",
-  education:         "bg-red-600",
-  utilities:         "bg-red-500",
-  insurance:         "bg-red-300",
-  taxes:             "bg-red-700",
-  other:             "bg-black",
+  material:          { label: "Materials",  icon: "solar:box-bold" },
+  equipment:         { label: "Equipment",  icon: "teenyicons:computer-outline" },
+  software:          { label: "Software",   icon: "hugeicons:software" },
+  internet:          { label: "Internet",   icon: "mdi:internet" },
+  telecommunication: { label: "Telecom",    icon: "grommet-icons:satellite" },
+  travel:            { label: "Travel",     icon: "mdi:airplane" },
+  education:         { label: "Education",  icon: "wpf:books" },
+  utilities:         { label: "Utilities",  icon: "roentgen:electricity" },
+  insurance:         { label: "Insurance",  icon: "carbon:manage-protection" },
+  taxes:             { label: "Taxes",      icon: "boxicons:bank-filled" },
+  other:             { label: "Other",      icon: "icon-park-solid:other" },
 };
 
 // ---------------------------------------------------------------------------
@@ -120,7 +107,7 @@ type Props = {
 export default function Sidebar({
   receipts, selectedId, onSelect, onUpload, onDelete, uploading, error,
 }: Props) {
-  const inputRef  = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [uploadType, setUploadType] = useState<"purchase" | "sale">("purchase");
 
@@ -143,11 +130,10 @@ export default function Sidebar({
   };
 
   return (
-    <aside className="w-60 shrink-0 bg-red-50 border-r-2 border-amber-400 flex flex-col overflow-hidden">
+    <aside className="w-60 shrink-0 bg-white border-r-2 border-red-500 flex flex-col overflow-hidden">
 
       {/* Upload */}
       <div className="p-3 border-b border-black/10 flex flex-col gap-2">
-        {/* Purchase / Sale toggle */}
         <div className="flex rounded border border-black/10 overflow-hidden text-xs font-bold">
           {(["purchase", "sale"] as const).map((t) => (
             <button
@@ -156,7 +142,7 @@ export default function Sidebar({
               className={`flex-1 py-1 transition-colors ${
                 uploadType === t
                   ? "bg-black text-white"
-                  : "bg-white text-black/40 hover:bg-amber-50"
+                  : "bg-white text-black/40 hover:bg-red-50"
               }`}
             >
               {t === "purchase" ? "Expense" : "Revenue"}
@@ -179,10 +165,7 @@ export default function Sidebar({
             </>
           ) : (
             <>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5}
-                  d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1M12 12V4m0 0l-3 3m3-3l3 3" />
-              </svg>
+              <Icon icon="mdi:upload" className="w-4 h-4" />
               Upload {uploadType === "sale" ? "Invoice" : "Receipt"}
             </>
           )}
@@ -197,7 +180,7 @@ export default function Sidebar({
         />
       </div>
 
-      {/* Error toast */}
+      {/* Error */}
       {error && (
         <div className="mx-3 mt-2 px-3 py-2 bg-red-50 border border-red-200 rounded text-xs text-pink-600 font-mono leading-relaxed">
           {error}
@@ -205,7 +188,7 @@ export default function Sidebar({
       )}
 
       {/* Count bar */}
-      <div className="px-4 py-2 text-xs text-black/40 font-mono bg-amber-50 border-b border-black/10">
+      <div className="px-4 py-2 text-xs text-black/40 font-mono bg-red-50 border-b border-black/10">
         {receipts.length} receipt{receipts.length !== 1 ? "s" : ""}
       </div>
 
@@ -221,23 +204,21 @@ export default function Sidebar({
             <div key={cat}>
               <button
                 onClick={() => toggle(cat)}
-                className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-amber-50 transition-colors border-b border-black/5"
+                className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-red-50 transition-colors border-b border-black/5"
               >
                 <span className="flex items-center gap-1.5 text-black text-xs font-bold uppercase tracking-wider">
-                  <span>{meta.icon}</span>
+                  <Icon icon={meta.icon} className="w-3.5 h-3.5 shrink-0" />
                   {meta.label}
                   <span className="bg-black text-white text-xs rounded-full px-1.5 py-0.5 font-mono leading-none">
                     {items.length}
                   </span>
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="text-amber-700 text-xs font-mono font-bold">{fmt(catTotal)}</span>
-                  <svg
-                    className={`w-3 h-3 text-black/30 transition-transform ${isOpen ? "rotate-90" : ""}`}
-                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
+                  <span className="text-red-500 text-xs font-mono font-bold">{fmt(catTotal)}</span>
+                  <Icon
+                    icon="mdi:chevron-right"
+                    className={`w-3.5 h-3.5 text-black/30 transition-transform ${isOpen ? "rotate-90" : ""}`}
+                  />
                 </span>
               </button>
 
@@ -247,15 +228,15 @@ export default function Sidebar({
                   onClick={() => onSelect(r)}
                   className={`flex items-start justify-between px-4 py-2 border-l-4 cursor-pointer group transition-colors ${
                     selectedId === r.id
-                      ? "border-amber-500 bg-amber-50"
-                      : "border-transparent hover:bg-amber-50/50 hover:border-amber-200"
+                      ? "border-red-500 bg-red-50"
+                      : "border-transparent hover:bg-red-50/50 hover:border-red-200"
                   }`}
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 min-w-0">
                       <span className={`shrink-0 text-[9px] font-black uppercase px-1 py-0.5 rounded leading-none ${
                         r.receipt_type === "sale"
-                          ? "bg-amber-400 text-black"
+                          ? "bg-red-500 text-white"
                           : "bg-black/10 text-black/50"
                       }`}>
                         {r.receipt_type === "sale" ? "rev" : "exp"}
@@ -268,7 +249,7 @@ export default function Sidebar({
                       <span className="text-xs text-black/40 font-mono">
                         {r.receipt_date ?? "no date"}
                       </span>
-                      <span className="text-xs text-amber-700 font-mono font-bold">
+                      <span className="text-xs text-red-500 font-mono font-bold">
                         {fmt(r.total_amount)}
                       </span>
                     </div>
@@ -279,9 +260,7 @@ export default function Sidebar({
                     className="ml-2 opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-all shrink-0 mt-0.5"
                     title="Delete"
                   >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
+                    <Icon icon="mdi:close" className="w-3.5 h-3.5" />
                   </button>
                 </div>
               ))}
@@ -291,7 +270,7 @@ export default function Sidebar({
 
         {receipts.length === 0 && (
           <div className="flex flex-col items-center justify-center gap-3 p-8 text-center">
-            <span className="text-4xl">🧾</span>
+            <Icon icon="mdi:receipt-text-outline" className="w-10 h-10 text-black/20" />
             <p className="text-black/40 text-xs leading-relaxed">
               No receipts yet.<br />Upload one to get started.
             </p>

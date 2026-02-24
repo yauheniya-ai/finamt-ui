@@ -1,5 +1,6 @@
+import { Icon } from "@iconify/react";
 import type { Receipt } from "./Sidebar";
-import { CATEGORY_META, CATEGORY_COLORS, fmt } from "./Sidebar";
+import { CATEGORY_META, fmt } from "./Sidebar";
 
 type Props = {
   receipts: Receipt[];
@@ -40,13 +41,12 @@ export default function Dashboard({ receipts }: Props) {
   const purchases = receipts.filter((r) => r.receipt_type === "purchase");
   const sales      = receipts.filter((r) => r.receipt_type === "sale");
 
-  const totalExpenses  = purchases.reduce((s, r) => s + (r.total_amount ?? 0), 0);
-  const totalRevenue   = sales.reduce((s, r) => s + (r.total_amount ?? 0), 0);
-  const inputVat       = purchases.reduce((s, r) => s + (r.vat_amount ?? 0), 0);   // Vorsteuer
-  const outputVat      = sales.reduce((s, r) => s + (r.vat_amount ?? 0), 0);       // Umsatzsteuer
-  const netLiability   = outputVat - inputVat;   // > 0 = you owe; < 0 = refund
+  const totalExpenses = purchases.reduce((s, r) => s + (r.total_amount ?? 0), 0);
+  const totalRevenue  = sales.reduce((s, r) => s + (r.total_amount ?? 0), 0);
+  const inputVat      = purchases.reduce((s, r) => s + (r.vat_amount ?? 0), 0);
+  const outputVat     = sales.reduce((s, r) => s + (r.vat_amount ?? 0), 0);
+  const netLiability  = outputVat - inputVat;
 
-  // Category totals over all receipts
   const categoryTotals = receipts.reduce<Record<string, number>>((acc, r) => {
     acc[r.category] = (acc[r.category] ?? 0) + (r.total_amount ?? 0);
     return acc;
@@ -98,17 +98,10 @@ export default function Dashboard({ receipts }: Props) {
         />
         <StatCard
           variant={netLiability === 0 ? "white" : netLiability > 0 ? "red" : "white"}
-          label={
-            netLiability === 0 
-              ? "VAT balance" 
-              : netLiability > 0 
-                ? "VAT liability" 
-                : "VAT refund"
-          }
+          label={netLiability === 0 ? "VAT balance" : netLiability > 0 ? "VAT liability" : "VAT refund"}
           value={fmt(Math.abs(netLiability))}
           sub={`output ${fmt(outputVat)} − input ${fmt(inputVat)}`}
         />
-
       </div>
 
       {/* Category bar chart */}
@@ -125,19 +118,17 @@ export default function Dashboard({ receipts }: Props) {
             {Object.entries(categoryTotals)
               .sort(([, a], [, b]) => b - a)
               .map(([cat, total]) => {
-                const pct   = Math.round((total / maxCat) * 100);
-                const color = CATEGORY_COLORS[cat] ?? "bg-black";
-                const meta  = CATEGORY_META[cat];
-
+                const pct  = Math.round((total / maxCat) * 100);
+                const meta = CATEGORY_META[cat];
                 return (
                   <div key={cat} className="flex items-center gap-3">
-                    <span className="text-xs text-black/60 font-bold w-24 capitalize shrink-0 flex items-center gap-1">
-                      <span>{meta?.icon}</span>
+                    <span className="text-xs text-black/60 font-bold w-24 capitalize shrink-0 flex items-center gap-1.5">
+                      {meta?.icon && <Icon icon={meta.icon} className="w-3.5 h-3.5 shrink-0" />}
                       {meta?.label ?? cat}
                     </span>
                     <div className="flex-1 bg-amber-100 border border-amber-200 rounded h-3 overflow-hidden">
                       <div
-                        className={`${color} h-3 rounded transition-all`}
+                        className="bg-black h-3 rounded transition-all"
                         style={{ width: `${pct}%` }}
                       />
                     </div>
@@ -217,9 +208,10 @@ export default function Dashboard({ receipts }: Props) {
                   </td>
                   <td className="py-2 text-black/50 font-mono">{r.receipt_date ?? "—"}</td>
                   <td className="py-2">
-                    <span className={`inline-block px-2 py-0.5 rounded text-white text-xs font-bold ${
-                      CATEGORY_COLORS[r.category] ?? "bg-black"
-                    }`}>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-black text-white text-xs font-bold">
+                      {CATEGORY_META[r.category]?.icon && (
+                        <Icon icon={CATEGORY_META[r.category].icon} className="w-3 h-3" />
+                      )}
                       {CATEGORY_META[r.category]?.label ?? r.category}
                     </span>
                   </td>
