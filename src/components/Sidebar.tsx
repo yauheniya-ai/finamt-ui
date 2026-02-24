@@ -143,7 +143,7 @@ export default function Sidebar({
   };
 
   return (
-    <aside className="w-60 shrink-0 bg-white border-r-2 border-amber-400 flex flex-col overflow-hidden">
+    <aside className="w-60 shrink-0 bg-red-50 border-r-2 border-amber-400 flex flex-col overflow-hidden">
 
       {/* Upload */}
       <div className="p-3 border-b border-black/10 flex flex-col gap-2">
