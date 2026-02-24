@@ -46,6 +46,18 @@ export default function Footer() {
           <Icon icon="file-icons:swagger" className="w-4 h-4" />
           API Docs
         </a>
+
+        {/* RTD */}
+        <a
+          href="https://docs.readthedocs.com"
+          target="_blank"
+          rel="noreferrer"
+          className="flex items-center gap-1 hover:text-red-500 transition-colors"
+        >
+          <Icon icon="simple-icons:readthedocs" className="w-4 h-4" />
+          Documentation
+        </a>
+
       </div>
 
       <div className="text-xs text-black/70 font-mono">
