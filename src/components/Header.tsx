@@ -1,13 +1,17 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import DBSelector, { type DBInfo } from "./DBSelector";
 
 const INSTALL_CMD = "pip install finanzamt";
 
 type Props = {
+  apiBase:          string;
+  activeDb:         string | null;
+  onDbSelect:       (db: DBInfo | null) => void;
   onLanguageChange?: (lang: "de" | "en") => void;
 };
 
-export default function Header({ onLanguageChange }: Props) {
+export default function Header({ apiBase, activeDb, onDbSelect, onLanguageChange }: Props) {
   const { t, i18n } = useTranslation();
   const isEN = i18n.language === "en";
   const [copied, setCopied] = useState(false);
@@ -39,7 +43,6 @@ export default function Header({ onLanguageChange }: Props) {
           </span>
         </div>
 
-        {/* Install command */}
         <div className="flex items-center gap-2">
           <code className="bg-black text-white text-xs font-mono px-2.5 py-0.5 rounded">
             {INSTALL_CMD}
@@ -50,12 +53,10 @@ export default function Header({ onLanguageChange }: Props) {
             className="text-black/40 hover:text-black transition-colors"
           >
             {copied ? (
-              /* Checkmark — shown for 2s after copy */
               <svg className="w-3.5 h-3.5 text-black/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
               </svg>
             ) : (
-              /* Two squares (classic copy icon) */
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <rect x="9" y="9" width="13" height="13" rx="1.5" strokeWidth={2} />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -66,22 +67,35 @@ export default function Header({ onLanguageChange }: Props) {
         </div>
       </div>
 
-      {/* Right — DE / EN toggle */}
-      <div
-        className="inline-flex items-center gap-3 cursor-pointer shrink-0 ml-6 select-none"
-        onClick={toggle}
-      >
-        <span className={`text-sm font-black font-mono transition-opacity ${!isEN ? "opacity-100" : "opacity-30"}`}>
-          DE
-        </span>
-        <div className={`relative w-10 h-6 rounded-full transition-colors duration-200 ${isEN ? "bg-red-500" : "bg-amber-400"}`}>
-          <div className={`absolute top-[4px] left-[4px] w-4 h-4 bg-black rounded-full transition-transform duration-200 ${isEN ? "translate-x-4" : "translate-x-0"}`} />
-        </div>
-        <span className={`text-sm font-black font-mono transition-opacity ${isEN ? "opacity-100" : "opacity-30"}`}>
-          EN
-        </span>
-      </div>
+      {/* Right — DB selector + DE/EN toggle */}
+      <div className="flex items-center gap-4 shrink-0 ml-6">
 
+        <DBSelector
+          apiBase={apiBase}
+          activeDb={activeDb}
+          onSelect={onDbSelect}
+        />
+
+        {/* Divider */}
+        <div className="w-px h-5 bg-black/15" />
+
+        {/* Language toggle */}
+        <div
+          className="inline-flex items-center gap-3 cursor-pointer select-none"
+          onClick={toggle}
+        >
+          <span className={`text-sm font-black font-mono transition-opacity ${!isEN ? "opacity-100" : "opacity-30"}`}>
+            DE
+          </span>
+          <div className={`relative w-10 h-6 rounded-full transition-colors duration-200 ${isEN ? "bg-red-500" : "bg-amber-400"}`}>
+            <div className={`absolute top-[4px] left-[4px] w-4 h-4 bg-black rounded-full transition-transform duration-200 ${isEN ? "translate-x-4" : "translate-x-0"}`} />
+          </div>
+          <span className={`text-sm font-black font-mono transition-opacity ${isEN ? "opacity-100" : "opacity-30"}`}>
+            EN
+          </span>
+        </div>
+
+      </div>
     </header>
   );
 }

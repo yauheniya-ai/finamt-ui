@@ -34,6 +34,50 @@ function StatCard({
 }
 
 // ---------------------------------------------------------------------------
+// Category bar chart (reusable)
+// ---------------------------------------------------------------------------
+
+function CategoryChart({
+  title, totals,
+}: {
+  title: string;
+  totals: Record<string, number>;
+}) {
+  const max = Math.max(...Object.values(totals), 1);
+  const sorted = Object.entries(totals).sort(([, a], [, b]) => b - a);
+
+  return (
+    <div className="bg-white border-2 border-amber-400 rounded p-4">
+      <h3 className="text-black text-sm font-black uppercase tracking-wider mb-4">{title}</h3>
+      {sorted.length === 0 ? (
+        <p className="text-black/30 text-sm text-center py-8 font-mono">No data yet.</p>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {sorted.map(([cat, total]) => {
+            const pct  = Math.round((total / max) * 100);
+            const meta = CATEGORY_META[cat];
+            return (
+              <div key={cat} className="flex items-center gap-3">
+                <span className="text-xs text-black/60 font-bold w-24 capitalize shrink-0 flex items-center gap-1.5">
+                  {meta?.icon && <Icon icon={meta.icon} className="w-3.5 h-3.5 shrink-0" />}
+                  {meta?.label ?? cat}
+                </span>
+                <div className="flex-1 bg-amber-100 border border-amber-200 rounded h-3 overflow-hidden">
+                  <div className="bg-black h-3 rounded transition-all" style={{ width: `${pct}%` }} />
+                </div>
+                <span className="text-xs text-black font-black font-mono w-24 text-right shrink-0">
+                  {fmt(total)}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -47,15 +91,16 @@ export default function Dashboard({ receipts }: Props) {
   const outputVat     = sales.reduce((s, r) => s + (r.vat_amount ?? 0), 0);
   const netLiability  = outputVat - inputVat;
 
-  const categoryTotals = receipts.reduce<Record<string, number>>((acc, r) => {
+  // Separate category totals for revenue and expenses
+  const revenueTotals = sales.reduce<Record<string, number>>((acc, r) => {
     acc[r.category] = (acc[r.category] ?? 0) + (r.total_amount ?? 0);
     return acc;
   }, {});
-  const maxCat = Math.max(...Object.values(categoryTotals), 1);
 
-  const recent = [...receipts]
-    .sort((a, b) => (b.receipt_date ?? "").localeCompare(a.receipt_date ?? ""))
-    .slice(0, 5);
+  const expenseTotals = purchases.reduce<Record<string, number>>((acc, r) => {
+    acc[r.category] = (acc[r.category] ?? 0) + (r.total_amount ?? 0);
+    return acc;
+  }, {});
 
   return (
     <main className="flex-1 overflow-y-auto bg-amber-50 p-6 flex flex-col gap-6">
@@ -64,8 +109,7 @@ export default function Dashboard({ receipts }: Props) {
       <div className="border-b-2 border-amber-400 pb-3">
         <h2 className="text-black text-xl font-black uppercase tracking-tight">Overview</h2>
         <p className="text-black/50 text-xs font-mono mt-0.5">
-          {receipts.length} receipt{receipts.length !== 1 ? "s" : ""} ·{" "}
-          {purchases.length} expense{purchases.length !== 1 ? "s" : ""} ·{" "}
+          {purchases.length} receipt{purchases.length !== 1 ? "s" : ""} ·{" "}
           {sales.length} invoice{sales.length !== 1 ? "s" : ""}
         </p>
       </div>
@@ -76,19 +120,13 @@ export default function Dashboard({ receipts }: Props) {
           variant="black"
           label="Total Revenue"
           value={fmt(totalRevenue)}
-          sub={`${sales.length} sales invoice${sales.length !== 1 ? "s" : ""}`}
+          sub={`${sales.length} invoice${sales.length !== 1 ? "s" : ""}`}
         />
         <StatCard
           variant="amber"
           label="Total Expenses"
           value={fmt(totalExpenses)}
-          sub={`${purchases.length} purchase receipt${purchases.length !== 1 ? "s" : ""}`}
-        />
-        <StatCard
-          variant="white"
-          label="Input VAT"
-          value={fmt(inputVat)}
-          sub="reclaimable"
+          sub={`${purchases.length} receipt${purchases.length !== 1 ? "s" : ""}`}
         />
         <StatCard
           variant="white"
@@ -97,74 +135,65 @@ export default function Dashboard({ receipts }: Props) {
           sub="payable"
         />
         <StatCard
-          variant={netLiability === 0 ? "white" : netLiability > 0 ? "red" : "white"}
-          label={netLiability === 0 ? "VAT balance" : netLiability > 0 ? "VAT liability" : "VAT refund"}
+          variant="white"
+          label="Input VAT"
+          value={fmt(inputVat)}
+          sub="reclaimable"
+        />
+        <StatCard
+          variant={netLiability > 0 ? "red" : "white"}
+          label={netLiability === 0 ? "VAT Balance" : netLiability > 0 ? "VAT Payable" : "VAT Refund"}
           value={fmt(Math.abs(netLiability))}
           sub={`output ${fmt(outputVat)} − input ${fmt(inputVat)}`}
         />
       </div>
 
-      {/* Category bar chart */}
-      <div className="bg-white border-2 border-amber-400 rounded p-4">
-        <h3 className="text-black text-sm font-black uppercase tracking-wider mb-4">
-          Spending by Category
-        </h3>
-        {Object.keys(categoryTotals).length === 0 ? (
-          <p className="text-black/30 text-sm text-center py-8 font-mono">
-            No data yet — upload receipts to see breakdown.
-          </p>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {Object.entries(categoryTotals)
-              .sort(([, a], [, b]) => b - a)
-              .map(([cat, total]) => {
-                const pct  = Math.round((total / maxCat) * 100);
-                const meta = CATEGORY_META[cat];
-                return (
-                  <div key={cat} className="flex items-center gap-3">
-                    <span className="text-xs text-black/60 font-bold w-24 capitalize shrink-0 flex items-center gap-1.5">
-                      {meta?.icon && <Icon icon={meta.icon} className="w-3.5 h-3.5 shrink-0" />}
-                      {meta?.label ?? cat}
-                    </span>
-                    <div className="flex-1 bg-amber-100 border border-amber-200 rounded h-3 overflow-hidden">
-                      <div
-                        className="bg-black h-3 rounded transition-all"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                    <span className="text-xs text-black font-black font-mono w-24 text-right shrink-0">
-                      {fmt(total)}
-                    </span>
-                  </div>
-                );
-              })}
+      {/* Category charts — side by side if both have data */}
+      <div className={`grid gap-4 ${
+        Object.keys(revenueTotals).length > 0 && Object.keys(expenseTotals).length > 0
+          ? "grid-cols-2"
+          : "grid-cols-1"
+      }`}>
+        {Object.keys(revenueTotals).length > 0 && (
+          <CategoryChart title="Revenue by Category" totals={revenueTotals} />
+        )}
+        {Object.keys(expenseTotals).length > 0 && (
+          <CategoryChart title="Spending by Category" totals={expenseTotals} />
+        )}
+        {receipts.length === 0 && (
+          <div className="bg-white border-2 border-amber-400 rounded p-8 text-center col-span-2">
+            <p className="text-black/30 text-sm font-mono">
+              No data yet — upload receipts to see breakdown.
+            </p>
           </div>
         )}
       </div>
 
-      {/* VAT summary table */}
+      {/* VAT summary */}
       {(inputVat > 0 || outputVat > 0) && (
         <div className="bg-white border-2 border-amber-400 rounded p-4">
           <h3 className="text-black text-sm font-black uppercase tracking-wider mb-3">
-            UStVA Summary
+            VAT Summary
           </h3>
           <table className="w-full text-xs">
             <tbody className="divide-y divide-black/10">
               <tr>
-                <td className="py-2 text-black/50 font-bold uppercase tracking-wider">Umsatzsteuer (output VAT)</td>
-                <td className="py-2 text-right font-mono font-black text-black">{fmt(outputVat)}</td>
+                <td className="py-2 text-black font-bold uppercase tracking-wider">
+                  Output VAT <span className="font-normal normal-case text-black/40">(payable)</span>
+                </td>
+                <td className="py-2 text-right font-mono font-bold text-black">{fmt(outputVat)}</td>
               </tr>
               <tr>
-                <td className="py-2 text-black/50 font-bold uppercase tracking-wider">Vorsteuer (input VAT)</td>
-                <td className="py-2 text-right font-mono font-black text-black">− {fmt(inputVat)}</td>
+                <td className="py-2 text-black font-bold uppercase tracking-wider">
+                  Input VAT <span className="font-normal normal-case text-black/40">(reclaimable)</span>
+                </td>
+                <td className="py-2 text-right font-mono font-bold text-black">{fmt(inputVat)}</td>
               </tr>
               <tr className="border-t-2 border-amber-400">
-                <td className="py-2 font-black uppercase tracking-wider text-black">
-                  {netLiability >= 0 ? "Zahllast (you owe)" : "Erstattung (you get back)"}
+                <td className="py-2 font-bold uppercase tracking-wider text-black">
+                  {netLiability > 0 ? "VAT Payable" : netLiability < 0 ? "VAT Refund" : "VAT Balance"}
                 </td>
-                <td className={`py-2 text-right font-black font-mono text-lg ${
-                  netLiability > 0 ? "text-red-500" : "text-green-600"
-                }`}>
+                <td className="py-2 text-right font-mono font-bold text-black">
                   {fmt(Math.abs(netLiability))}
                 </td>
               </tr>
@@ -172,58 +201,6 @@ export default function Dashboard({ receipts }: Props) {
           </table>
         </div>
       )}
-
-      {/* Recent receipts */}
-      <div className="bg-white border-2 border-amber-400 rounded p-4">
-        <h3 className="text-black text-sm font-black uppercase tracking-wider mb-3">
-          Recent Receipts
-        </h3>
-        {recent.length === 0 ? (
-          <p className="text-black/30 text-sm text-center py-4 font-mono">Nothing here yet.</p>
-        ) : (
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b-2 border-amber-400 text-black">
-                {["Type", "Counterparty", "Date", "Category", "Amount"].map((h, i) => (
-                  <th key={h} className={`pb-2 font-black uppercase tracking-wider ${i === 4 ? "text-right" : "text-left"}`}>
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {recent.map((r) => (
-                <tr key={r.id} className="border-b border-black/10 hover:bg-amber-50 transition-colors">
-                  <td className="py-2">
-                    <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${
-                      r.receipt_type === "sale"
-                        ? "bg-amber-400 text-black"
-                        : "bg-black/10 text-black/60"
-                    }`}>
-                      {r.receipt_type === "sale" ? "rev" : "exp"}
-                    </span>
-                  </td>
-                  <td className="py-2 text-black font-bold truncate max-w-[140px]">
-                    {r.vendor ?? r.counterparty?.name ?? "—"}
-                  </td>
-                  <td className="py-2 text-black/50 font-mono">{r.receipt_date ?? "—"}</td>
-                  <td className="py-2">
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-black text-white text-xs font-bold">
-                      {CATEGORY_META[r.category]?.icon && (
-                        <Icon icon={CATEGORY_META[r.category].icon} className="w-3 h-3" />
-                      )}
-                      {CATEGORY_META[r.category]?.label ?? r.category}
-                    </span>
-                  </td>
-                  <td className="py-2 text-black font-black font-mono text-right">
-                    {fmt(r.total_amount)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
 
       {/* Placeholder tiles */}
       <div className="grid grid-cols-2 gap-3">
