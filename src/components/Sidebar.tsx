@@ -23,12 +23,14 @@ export type Counterparty = {
 };
 
 export type ReceiptItem = {
+  position:    number | null;
   description: string;
   quantity:    number | null;
   unit_price:  number | null;
   total_price: number | null;
-  category:    string;
   vat_rate:    number | null;
+  vat_amount:  number | null;
+  category:    string;
 };
 
 export type Receipt = {
