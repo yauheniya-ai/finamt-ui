@@ -29,7 +29,7 @@ export default function Header({ apiBase, activeDb, onDbSelect, onLanguageChange
   };
 
   return (
-    <header className="bg-white border-b-2 border-red-500 px-6 py-4 flex items-center justify-between shrink-0">
+    <header className="bg-white border-b-2 border-black px-6 py-4 flex items-center justify-between shrink-0">
 
       {/* Left — title + subtitle */}
       <div className="flex flex-col gap-1">

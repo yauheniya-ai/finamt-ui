@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 
 // ---------------------------------------------------------------------------
@@ -54,22 +55,22 @@ export type Receipt = {
 
 export const CATEGORY_META: Record<string, { label: string; icon: string }> = {
   // ── Revenue categories (sales) ──────────────────────────────────────────
-  services:          { label: "Services",   icon: "mdi:briefcase-outline" },
-  consulting:        { label: "Consulting", icon: "mdi:head-lightbulb-outline" },
-  products:          { label: "Products",   icon: "mdi:package-variant-closed" },
-  licensing:         { label: "Licensing",  icon: "mdi:file-certificate-outline" },
+  services:          { label: "services",   icon: "mdi:briefcase-outline" },
+  consulting:        { label: "consulting", icon: "mdi:head-lightbulb-outline" },
+  products:          { label: "products",   icon: "mdi:package-variant-closed" },
+  licensing:         { label: "licensing",  icon: "mdi:file-certificate-outline" },
   // ── Expense categories (purchases) ──────────────────────────────────────
-  material:          { label: "Materials",  icon: "solar:box-bold" },
-  equipment:         { label: "Equipment",  icon: "teenyicons:computer-outline" },
-  software:          { label: "Software",   icon: "hugeicons:software" },
-  internet:          { label: "Internet",   icon: "mdi:internet" },
-  telecommunication: { label: "Telecom",    icon: "grommet-icons:satellite" },
-  travel:            { label: "Travel",     icon: "mdi:airplane" },
-  education:         { label: "Education",  icon: "wpf:books" },
-  utilities:         { label: "Utilities",  icon: "roentgen:electricity" },
-  insurance:         { label: "Insurance",  icon: "carbon:manage-protection" },
-  taxes:             { label: "Taxes",      icon: "boxicons:bank-filled" },
-  other:             { label: "Other",      icon: "icon-park-solid:other" },
+  material:          { label: "material",  icon: "solar:box-bold" },
+  equipment:         { label: "equipment",  icon: "teenyicons:computer-outline" },
+  software:          { label: "software",   icon: "hugeicons:software" },
+  internet:          { label: "internet",   icon: "mdi:internet" },
+  telecommunication: { label: "telecommunication",    icon: "grommet-icons:satellite" },
+  travel:            { label: "travel",     icon: "mdi:airplane" },
+  education:         { label: "education",  icon: "wpf:books" },
+  utilities:         { label: "utilities",  icon: "roentgen:electricity" },
+  insurance:         { label: "insurance",  icon: "carbon:manage-protection" },
+  taxes:             { label: "taxes",      icon: "boxicons:bank-filled" },
+  other:             { label: "other",      icon: "icon-park-solid:other" },
 };
 
 // Revenue-side categories — used to split sidebar sections
@@ -137,29 +138,30 @@ export function filterByPeriod(receipts: Receipt[], period: PeriodFilter): Recei
 // ---------------------------------------------------------------------------
 
 function DeleteConfirm({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
+  const { t } = useTranslation();
   return (
     <div
       className="absolute right-0 top-6 z-20 bg-white border-2 border-black rounded shadow-lg p-3 flex flex-col gap-2 w-44"
       onClick={(e) => e.stopPropagation()}
     >
       <p className="text-xs font-bold text-black leading-snug">
-        Delete from database?
+        {t("sidebar.delete_confirm.title")}
       </p>
       <p className="text-[10px] text-black/50 font-mono leading-relaxed">
-        This cannot be undone. The PDF archive is kept.
+        {t("sidebar.delete_confirm.hint")}
       </p>
       <div className="flex gap-1.5 mt-1">
         <button
           onClick={onConfirm}
           className="flex-1 bg-red-500 hover:bg-red-600 text-white text-xs font-bold py-1 rounded transition-colors"
         >
-          Delete
+          {t("sidebar.delete_confirm.confirm")}
         </button>
         <button
           onClick={onCancel}
           className="flex-1 bg-black/5 hover:bg-black/10 text-black text-xs font-bold py-1 rounded transition-colors"
         >
-          Cancel
+          {t("sidebar.delete_confirm.cancel")}
         </button>
       </div>
     </div>
@@ -202,6 +204,7 @@ function CategoryGroup({
   onDeleteConfirm: (id: string) => void;
   onDeleteCancel:  () => void;
 }) {
+  const { t } = useTranslation();
   const catTotal = items.reduce((s, r) => s + (r.total_amount ?? 0), 0);
 
   return (
@@ -210,12 +213,9 @@ function CategoryGroup({
         onClick={onToggle}
         className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-red-50 transition-colors border-b border-black/5"
       >
-        <span className="flex items-center gap-1.5 text-black text-xs font-bold uppercase tracking-wider">
+        <span className="flex items-center gap-1.5 text-black text-xs font-bold uppercase tracking-wider min-w-0">
           <Icon icon={meta.icon} className="w-3.5 h-3.5 shrink-0" />
-          {meta.label}
-          <span className="bg-black text-white text-xs rounded-full px-1.5 py-0.5 font-mono leading-none">
-            {items.length}
-          </span>
+          <span className="truncate" title={t(`sidebar.categories.${meta.label}`, meta.label)}>{t(`sidebar.categories.${meta.label}`, meta.label)}</span>
         </span>
         <span className="flex items-center gap-1.5">
           <span className="text-black text-xs font-mono font-bold">{fmt(catTotal)}</span>
@@ -251,7 +251,7 @@ function CategoryGroup({
             </div>
             <div className="flex items-center justify-between mt-0.5">
               <span className="text-xs text-black/40 font-mono">
-                {r.receipt_date ?? "no date"}
+                {r.receipt_date ?? t("sidebar.no_date")}
               </span>
               <span className="text-xs text-black font-mono font-bold">
                 {fmt(r.total_amount)}
@@ -286,15 +286,18 @@ function CategoryGroup({
 // Section divider
 // ---------------------------------------------------------------------------
 
-function SectionDivider({ label, count, total }: { label: string; count: number; total: number }) {
+function SectionDivider({ label, count, total, isRevenue }: { label: string; count: number; total: number; isRevenue: boolean }) {
   return (
-    <div className="flex items-center justify-between px-3 py-1.5 bg-black">
-      <span className="text-[10px] font-black uppercase tracking-widest text-white/70">
-        {label}
+    <div className="flex items-center justify-between px-3 py-1.5">
+      <span className="flex items-center gap-1.5">
+        <span className={`text-[10px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded ${isRevenue ? "bg-black text-amber-400" : "bg-amber-400 text-black"}`}>
+          {label}
+        </span>
+        <span className="bg-black text-white text-xs rounded-full px-1.5 py-0.5 font-mono font-bold leading-none">
+          {count}
+        </span>
       </span>
-      <span className="text-[10px] font-mono text-white/50">
-        {count} · {fmt(total)}
-      </span>
+      <span className="text-[10px] font-mono font-bold">{fmt(total)}</span>
     </div>
   );
 }
@@ -303,7 +306,7 @@ function SectionDivider({ label, count, total }: { label: string; count: number;
 // Main component
 // ---------------------------------------------------------------------------
 
-const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+// MONTHS rendered via t("sidebar.months") array
 
 export default function Sidebar({
   receipts, selectedId, onSelect, onUpload, onDelete, uploading, error,
@@ -311,6 +314,7 @@ export default function Sidebar({
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [collapsed,    setCollapsed]    = useState<Set<string>>(new Set());
+  const { t } = useTranslation();
   const [uploadType,   setUploadType]   = useState<"purchase" | "sale">("purchase");
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
@@ -349,19 +353,19 @@ export default function Sidebar({
   const revenueCats  = Object.entries(CATEGORY_META).filter(([cat]) => REVENUE_CATS.has(cat));
   const expenseCats  = Object.entries(CATEGORY_META).filter(([cat]) => !REVENUE_CATS.has(cat));
 
-  const renderGroup = (cat: string, meta: { label: string; icon: string }) => {
-    const items = grouped[cat];
-    if (!items?.length) return null;
+  const renderGroup = (cat: string, meta: { label: string; icon: string }, type: "purchase" | "sale") => {
+    const items = (grouped[cat] ?? []).filter((r) => r.receipt_type === type);
+    if (!items.length) return null;
     return (
       <CategoryGroup
-        key={cat}
+        key={`${type}-${cat}`}
         cat={cat}
         meta={meta}
         items={items}
-        isOpen={!collapsed.has(cat)}
+        isOpen={!collapsed.has(`${type}-${cat}`)}
         selectedId={selectedId}
         confirmingId={confirmingId}
-        onToggle={() => toggle(cat)}
+        onToggle={() => toggle(`${type}-${cat}`)}
         onSelect={onSelect}
         onDeleteClick={handleDeleteClick}
         onDeleteConfirm={handleDeleteConfirm}
@@ -376,17 +380,17 @@ export default function Sidebar({
       {/* Upload */}
       <div className="p-3 border-b border-black/10 flex flex-col gap-2">
         <div className="flex rounded border border-black/10 overflow-hidden text-xs font-bold">
-          {(["purchase", "sale"] as const).map((t) => (
+          {(["purchase", "sale"] as const).map((type) => (
             <button
-              key={t}
-              onClick={() => setUploadType(t)}
+              key={type}
+              onClick={() => setUploadType(type)}
               className={`flex-1 py-1 transition-colors ${
-                uploadType === t
+                uploadType === type
                   ? "bg-black text-white"
                   : "bg-white text-black/40 hover:bg-red-50"
               }`}
             >
-              {t === "purchase" ? "Expense" : "Revenue"}
+              {type === "purchase" ? t("sidebar.expense") : t("sidebar.revenue")}
             </button>
           ))}
         </div>
@@ -398,13 +402,13 @@ export default function Sidebar({
         >
           {uploading ? (
             <>
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><rect width="24" height="24" fill="none"/><path fill="#fff" d="M12,23a9.63,9.63,0,0,1-8-9.5,9.51,9.51,0,0,1,6.79-9.1A1.66,1.66,0,0,0,12,2.81h0a1.67,1.67,0,0,0-1.94-1.64A11,11,0,0,0,12,23Z"><animateTransform attributeName="transform" dur="0.75s" repeatCount="indefinite" type="rotate" values="0 12 12;360 12 12"/></path></svg>
-              Processing…
+              <Icon icon="svg-spinners:12-dots-scale-rotate" className="w-4 h-4" />
+              {t("sidebar.processing")}
             </>
           ) : (
             <>
               <Icon icon="mdi:upload" className="w-4 h-4" />
-              Upload {uploadType === "sale" ? "Invoice" : "Receipt"}
+              {uploadType === "sale" ? t("sidebar.upload_invoice") : t("sidebar.upload_receipt")}
             </>
           )}
         </button>
@@ -439,7 +443,7 @@ export default function Sidebar({
                   : "bg-white text-black/40 hover:bg-red-50"
               }`}
             >
-              {m}
+              {t(`sidebar.period.${m}`, m)}
             </button>
           ))}
         </div>
@@ -485,7 +489,7 @@ export default function Sidebar({
         {/* Month picker */}
         {period.mode === "month" && (
           <div className="grid grid-cols-4 gap-1">
-            {MONTHS.map((name, i) => (
+            {(t("sidebar.months", { returnObjects: true }) as string[]).map((name: string, i: number) => (
               <button
                 key={i}
                 onClick={() => onPeriodChange({ ...period, month: i + 1 })}
@@ -508,56 +512,18 @@ export default function Sidebar({
         {/* Revenue section */}
         {sales.length > 0 && (
           <>
-            <SectionDivider label="Revenue" count={sales.length} total={saleTotal} />
-            {revenueCats.map(([cat, meta]) => renderGroup(cat, meta))}
+            <SectionDivider label={t("sidebar.revenue")} count={sales.length} total={saleTotal} isRevenue={true} />
+            {revenueCats.map(([cat, meta]) => renderGroup(cat, meta, "sale"))}
             {/* Revenue items that fell into expense categories */}
-            {expenseCats.map(([cat, meta]) => {
-              const items = (grouped[cat] ?? []).filter((r) => r.receipt_type === "sale");
-              if (!items.length) return null;
-              return (
-                <CategoryGroup
-                  key={`sale-${cat}`}
-                  cat={cat}
-                  meta={meta}
-                  items={items}
-                  isOpen={!collapsed.has(`sale-${cat}`)}
-                  selectedId={selectedId}
-                  confirmingId={confirmingId}
-                  onToggle={() => toggle(`sale-${cat}`)}
-                  onSelect={onSelect}
-                  onDeleteClick={handleDeleteClick}
-                  onDeleteConfirm={handleDeleteConfirm}
-                  onDeleteCancel={handleDeleteCancel}
-                />
-              );
-            })}
+            {expenseCats.map(([cat, meta]) => renderGroup(cat, meta, "sale"))}
           </>
         )}
 
         {/* Expense section */}
         {purchases.length > 0 && (
           <>
-            <SectionDivider label="Expenses" count={purchases.length} total={purchaseTotal} />
-            {expenseCats.map(([cat, meta]) => {
-              const items = (grouped[cat] ?? []).filter((r) => r.receipt_type === "purchase");
-              if (!items.length) return null;
-              return (
-                <CategoryGroup
-                  key={`purchase-${cat}`}
-                  cat={cat}
-                  meta={meta}
-                  items={items}
-                  isOpen={!collapsed.has(`purchase-${cat}`)}
-                  selectedId={selectedId}
-                  confirmingId={confirmingId}
-                  onToggle={() => toggle(`purchase-${cat}`)}
-                  onSelect={onSelect}
-                  onDeleteClick={handleDeleteClick}
-                  onDeleteConfirm={handleDeleteConfirm}
-                  onDeleteCancel={handleDeleteCancel}
-                />
-              );
-            })}
+            <SectionDivider label={t("sidebar.expenses")} count={purchases.length} total={purchaseTotal} isRevenue={false} />
+            {expenseCats.map(([cat, meta]) => renderGroup(cat, meta, "purchase"))}
           </>
         )}
 
@@ -565,7 +531,7 @@ export default function Sidebar({
           <div className="flex flex-col items-center justify-center gap-3 p-8 text-center">
             <Icon icon="mdi:receipt-text-outline" className="w-10 h-10 text-black/20" />
             <p className="text-black/40 text-xs leading-relaxed">
-              No receipts yet.<br />Upload one to get started.
+              {t("sidebar.no_receipts")}<br />{t("sidebar.no_receipts_hint")}
             </p>
           </div>
         )}

@@ -82,59 +82,69 @@ function CategorySelect({
 // ---------------------------------------------------------------------------
 
 type DraftItem = {
+  position:    number;
   description: string;
-  quantity:    string;
-  unit_price:  string;
-  total_price: string;
   vat_rate:    string;
+  vat_amount:  string;
+  total_price: string;
   category:    string;
 };
 
 function ItemRow({
-  item, editing, draft, onChange,
+  item, editing, draft, onChange, onDelete, index,
 }: {
   item:     ReceiptItem;
   editing:  boolean;
   draft:    DraftItem;
   onChange: (field: keyof DraftItem, value: string) => void;
+  onDelete: () => void;
+  index:    number;
 }) {
+  const pos = item.position ?? index + 1;
   if (!editing) {
     return (
       <div className="px-3 py-2">
         <div className="flex justify-between items-start gap-2">
+          <span className="text-[10px] font-black text-black/30 font-mono shrink-0 w-4">{pos}.</span>
           <span className="text-xs text-black font-semibold flex-1 min-w-0">{item.description}</span>
           <span className="text-xs text-black font-black font-mono shrink-0">{fmt(item.total_price)}</span>
         </div>
-        {(item.quantity != null || item.unit_price != null || item.vat_rate != null) && (
-          <div className="text-xs text-black/40 font-mono mt-0.5">
-            {item.quantity != null && `${item.quantity}×`}
-            {item.unit_price != null && ` ${fmt(item.unit_price)}`}
-            {item.vat_rate  != null && ` · ${item.vat_rate}% VAT`}
-          </div>
-        )}
+        <div className="text-xs text-black/40 font-mono mt-0.5 flex gap-2 pl-6">
+          {item.vat_rate   != null && <span>{item.vat_rate}% VAT</span>}
+          {item.vat_amount != null && <span>{fmt(item.vat_amount)} VAT</span>}
+        </div>
       </div>
     );
   }
 
   return (
     <div className="px-3 py-2 flex flex-col gap-1.5 bg-amber-50/50">
-      <input
-        value={draft.description}
-        onChange={(e) => onChange("description", e.target.value)}
-        placeholder="Description"
-        className="w-full text-xs font-semibold text-black bg-white border border-amber-300 rounded px-2 py-1 outline-none focus:border-amber-500"
-      />
-      <div className="grid grid-cols-4 gap-1">
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] font-black text-black/30 font-mono w-4 shrink-0">{draft.position}.</span>
+        <input
+          value={draft.description}
+          onChange={(e) => onChange("description", e.target.value)}
+          placeholder="Description"
+          className="flex-1 text-xs font-semibold text-black bg-white border border-amber-300 rounded px-2 py-1 outline-none focus:border-amber-500"
+        />
+        <button
+          onClick={onDelete}
+          title="Delete item"
+          className="shrink-0 text-black/30 hover:text-red-500 transition-colors"
+        >
+          <Icon icon="mdi:trash-can-outline" className="w-3.5 h-3.5" />
+        </button>
+      </div>
+      <div className="grid grid-cols-3 gap-1 pl-6">
         {([
-          ["qty",       "quantity",    "Qty"],
-          ["unit_price","unit_price",  "Unit €"],
-          ["total",     "total_price", "Total €"],
-          ["vat",       "vat_rate",    "VAT %"],
-        ] as [string, keyof DraftItem, string][]).map(([, field, label]) => (
+          ["vat_rate",    "VAT %"],
+          ["vat_amount",  "VAT €"],
+          ["total_price", "Total €"],
+        ] as [keyof DraftItem, string][]).map(([field, label]) => (
           <div key={field} className="flex flex-col gap-0.5">
             <span className="text-[9px] font-bold uppercase text-black/40">{label}</span>
             <input
-              value={draft[field]}
+              value={draft[field] as string}
               onChange={(e) => onChange(field, e.target.value)}
               className="w-full text-xs font-mono text-black bg-white border border-amber-300 rounded px-1.5 py-0.5 outline-none focus:border-amber-500"
             />
@@ -220,6 +230,7 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
   });
 
   const [itemDrafts, setItemDrafts] = useState<DraftItem[]>([]);
+  const [confirmDeleteIdx, setConfirmDeleteIdx] = useState<number | null>(null);
 
   if (!receipt) return <EmptyState />;
 
@@ -249,12 +260,12 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
       category:              receipt.category ?? "",
     });
     setItemDrafts(
-      (receipt.items ?? []).map((item) => ({
-        description: item.description ?? "",
-        quantity:    item.quantity?.toString()   ?? "",
-        unit_price:  item.unit_price?.toString() ?? "",
+      (receipt.items ?? []).map((item, i) => ({
+        position:    item.position ?? i + 1,
+        description: item.description  ?? "",
+        vat_rate:    item.vat_rate?.toString()    ?? "",
+        vat_amount:  item.vat_amount?.toString()  ?? "",
         total_price: item.total_price?.toString() ?? "",
-        vat_rate:    item.vat_rate?.toString()   ?? "",
         category:    item.category ?? "other",
       }))
     );
@@ -267,6 +278,11 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
 
   const setItem = (i: number, field: keyof DraftItem, value: string) =>
     setItemDrafts((prev) => prev.map((d, idx) => idx === i ? { ...d, [field]: value } : d));
+
+  const deleteItem = (i: number) => {
+    setItemDrafts((prev) => prev.filter((_, idx) => idx !== i).map((d, idx) => ({ ...d, position: idx + 1 })));
+    setConfirmDeleteIdx(null);
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -305,6 +321,16 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
       addrKeys.forEach((k, i) => { if (draft[addrDraftKeys[i]]) addr[k] = draft[addrDraftKeys[i]]; });
       if (Object.keys(addr).length) payload["address"] = addr;
 
+      // Items — always send when editing so deletions persist
+      payload["items"] = itemDrafts.map((d) => ({
+        position:    d.position,
+        description: d.description || null,
+        vat_rate:    d.vat_rate    ? parseFloat(d.vat_rate)    : null,
+        vat_amount:  d.vat_amount  ? parseFloat(d.vat_amount)  : null,
+        total_price: d.total_price ? parseFloat(d.total_price) : null,
+        category:    d.category || "other",
+      }));
+
       const res = await fetch(
         `${apiBase}/receipts/${receipt.id}${qs(dbPath)}`,
         {
@@ -336,7 +362,7 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
         <PDFOverlay url={pdfUrl} onClose={() => setPdfOpen(false)} />
       )}
 
-      <aside className="w-[380px] shrink-0 bg-white border-l-2 border-black flex flex-col overflow-hidden">
+      <aside className="w-[380px] shrink-0 bg-white border-l-2 border-amber-400 flex flex-col overflow-hidden">
 
         {/* ── Header ──────────────────────────────────────────────────── */}
         <div className="px-4 py-3 border-b-2 border-black bg-amber-400 flex items-start justify-between gap-2 shrink-0">
@@ -361,16 +387,21 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
 
           <div className="flex items-center gap-2 shrink-0">
             {!editing ? (
-              <button
-                onClick={startEditing}
-                className="text-xs font-bold bg-black text-white px-2.5 py-1 rounded hover:bg-black/80 transition-colors"
-              >
-                Edit
-              </button>
+              <div className="relative group">
+                <button
+                  onClick={startEditing}
+                  className="bg-red-500 text-white p-1.5 rounded hover:bg-red-600 transition-colors"
+                >
+                  <Icon icon="fe:edit" className="w-4 h-4" />
+                </button>
+                <span className="pointer-events-none absolute right-0 top-full mt-1 whitespace-nowrap bg-black text-white text-[10px] font-bold px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                  Edit
+                </span>
+              </div>
             ) : (
               <button
                 onClick={cancelEditing}
-                className="text-xs font-bold bg-white text-black px-2.5 py-1 rounded border border-black hover:bg-black/5 transition-colors"
+                className="text-xs font-bold bg-white text-red-500 px-2.5 py-1 rounded border border-red-500 hover:bg-red-50 transition-colors"
               >
                 Cancel
               </button>
@@ -392,7 +423,7 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
           </div>
         )}
         {saveErr && (
-          <div className="mx-4 mt-3 px-3 py-2 bg-pink-50 border border-pink-200 rounded text-xs text-pink-600 font-mono flex items-center gap-2">
+          <div className="mx-4 mt-3 px-3 py-2 bg-red-50 border border-red-200 rounded text-xs text-pink-600 font-mono flex items-center gap-2">
             <Icon icon="mdi:alert-circle-outline" className="w-3.5 h-3.5 shrink-0" />
             {saveErr}
           </div>
@@ -547,21 +578,54 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
           {(receipt.items?.length > 0 || editing) && (
             <section>
               <h3 className="text-black text-xs font-black uppercase tracking-wider mb-2">
-                Items {receipt.items?.length > 0 && `(${receipt.items.length})`}
+                Items {editing
+                  ? (itemDrafts.length > 0 ? `(${itemDrafts.length})` : "")
+                  : (receipt.items?.length > 0 ? `(${receipt.items.length})` : "")}
               </h3>
               <div className="border-2 border-black rounded divide-y divide-black/10 overflow-hidden">
-                {(receipt.items ?? []).map((item, i) => (
-                  <ItemRow
-                    key={i}
-                    item={item}
-                    editing={editing}
-                    draft={itemDrafts[i] ?? {
-                      description: item.description, quantity: "",
-                      unit_price: "", total_price: "", vat_rate: "", category: "other",
-                    }}
-                    onChange={(field, value) => setItem(i, field, value)}
-                  />
-                ))}
+                {editing ? (
+                  // Edit mode: render purely from itemDrafts — no reference to receipt.items
+                  itemDrafts.length === 0 ? (
+                    <div className="px-3 py-3 text-xs text-black/30 font-mono text-center">No items</div>
+                  ) : itemDrafts.map((d, i) => (
+                    <div key={d.position}>
+                      <ItemRow
+                        index={i}
+                        item={{ description: d.description, position: d.position } as ReceiptItem}
+                        editing={true}
+                        draft={d}
+                        onChange={(field, value) => setItem(i, field, value)}
+                        onDelete={() => setConfirmDeleteIdx(i)}
+                      />
+                      {confirmDeleteIdx === i && (
+                        <div className="px-3 py-2 bg-red-50 border-t border-red-200 flex items-center justify-between gap-2">
+                          <span className="text-xs text-red-600 font-bold">Delete item {d.position}?</span>
+                          <div className="flex gap-2">
+                            <button onClick={() => deleteItem(i)}
+                              className="text-[11px] font-black bg-red-500 text-white px-2 py-0.5 rounded hover:bg-red-600 transition-colors"
+                            >Yes</button>
+                            <button onClick={() => setConfirmDeleteIdx(null)}
+                              className="text-[11px] font-black bg-white text-red-500 border border-red-400 px-2 py-0.5 rounded hover:bg-red-50 transition-colors"
+                            >No</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  // View mode: render from receipt.items
+                  (receipt.items ?? []).map((item, i) => (
+                    <ItemRow
+                      key={i}
+                      index={i}
+                      item={item}
+                      editing={false}
+                      draft={{ position: item.position ?? i+1, description: "", vat_rate: "", vat_amount: "", total_price: "", category: "other" }}
+                      onChange={() => {}}
+                      onDelete={() => {}}
+                    />
+                  ))
+                )}
               </div>
             </section>
           )}

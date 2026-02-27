@@ -1,5 +1,60 @@
 {
   "header": {
     "subtitle": "eine Python-Bibliothek zur Extraktion steuerrelevanter Daten aus Belegen und zur Erstellung deutscher Steuererklärungen"
+  },
+  "sidebar": {
+    "upload_receipt": "Beleg hochladen",
+    "upload_invoice": "Rechnung hochladen",
+    "processing": "Verarbeitung…",
+    "expense": "Ausgabe",
+    "revenue": "Einnahmen",
+    "expenses": "Ausgaben",
+    "no_date": "kein Datum",
+    "no_receipts": "Noch keine Belege.",
+    "no_receipts_hint": "Lade einen hoch, um zu beginnen.",
+    "period": {
+      "all": "Alle",
+      "year": "Jahr",
+      "quarter": "Quartal",
+      "month": "Monat"
+    },
+    "months": [
+      "Jan",
+      "Feb",
+      "Mär",
+      "Apr",
+      "Mai",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Okt",
+      "Nov",
+      "Dez"
+    ],
+    "delete_confirm": {
+      "title": "Aus Datenbank löschen?",
+      "hint": "Dies kann nicht rückgängig gemacht werden. Das PDF-Archiv bleibt erhalten.",
+      "confirm": "Löschen",
+      "cancel": "Abbrechen"
+    },
+    "categories": {
+      "services": "Dienstleistungen",
+      "consulting": "Beratung",
+      "products": "Produkte",
+      "licensing": "Lizenzen",
+      "material": "Materialien",
+      "equipment": "Geräte",
+      "software": "Software",
+      "internet": "Internet",
+      "telecommunication": "Telekommunikation",
+      "travel": "Reisen",
+      "education": "Bildung",
+      "utilities": "Versorgung",
+      "insurance": "Versicherung",
+      "taxes": "Steuern",
+      "other": "Sonstiges"
+    },
+    "revenues": "Einnahmen"
   }
 }
