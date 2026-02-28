@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import i18n from "../i18n";
 import { Icon } from "@iconify/react";
 
 // ---------------------------------------------------------------------------
@@ -84,7 +85,8 @@ const REVENUE_CATS = new Set(["services", "consulting", "products", "licensing"]
 
 export function fmt(amount: number | null | undefined, currency = "EUR"): string {
   if (amount == null) return "—";
-  return new Intl.NumberFormat("de-DE", { style: "currency", currency }).format(amount);
+  const locale = i18n.language === "en" ? "en-US" : "de-DE";
+  return new Intl.NumberFormat(locale, { style: "currency", currency }).format(amount);
 }
 
 export function displayName(r: Receipt): string {
