@@ -191,7 +191,7 @@ type Props = {
 // ---------------------------------------------------------------------------
 
 function CategoryGroup({
-  cat, meta, items, isOpen, selectedId, confirmingId,
+  cat: _cat, meta, items, isOpen, selectedId, confirmingId,
   onToggle, onSelect, onDeleteClick, onDeleteConfirm, onDeleteCancel,
 }: {
   cat:             string;
