@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Icon } from "@iconify/react";
 import type { Receipt, ReceiptItem } from "./Sidebar";
 import { fmt, CATEGORY_META } from "./Sidebar";
+import { useTranslation } from "react-i18next";
 
 type Props = {
   receipt:  Receipt | null;
@@ -56,13 +57,14 @@ function FieldRow({ label, value, editing, inputValue, onInput, placeholder }: {
 // CategorySelect
 // ---------------------------------------------------------------------------
 function CategorySelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const { t } = useTranslation();
   return (
     <div className="flex items-start justify-between gap-3 py-2 border-b border-black/10">
-      <span className="text-xs text-black/50 font-bold uppercase tracking-wider shrink-0 w-28 pt-0.5">Category</span>
+      <span className="text-xs text-black/50 font-bold uppercase tracking-wider shrink-0 w-28 pt-0.5">{t("preview.field_category")}</span>
       <select value={value} onChange={(e) => onChange(e.target.value)}
         className="flex-1 min-w-0 text-xs text-black font-mono bg-amber-50 border border-amber-300 rounded px-2 py-1 outline-none focus:border-amber-500">
         {Object.entries(CATEGORY_META).map(([k, v]) => (
-          <option key={k} value={k}>{v.label}</option>
+          <option key={k} value={k}>{t(`sidebar.categories.${k}`, { defaultValue: v.label })}</option>
         ))}
       </select>
     </div>
@@ -82,6 +84,7 @@ function ItemRow({ item, editing, draft, onChange, onDelete, index }: {
   onChange: (field: keyof DraftItem, value: string) => void;
   onDelete: () => void; index: number;
 }) {
+  const { t } = useTranslation();
   const pos = item.position ?? index + 1;
   if (!editing) {
     return (
@@ -92,8 +95,8 @@ function ItemRow({ item, editing, draft, onChange, onDelete, index }: {
           <span className="text-xs text-black font-black font-mono shrink-0">{fmt(item.total_price)}</span>
         </div>
         <div className="text-xs text-black/40 font-mono mt-0.5 flex gap-2 pl-6">
-          {item.vat_rate   != null && <span>{item.vat_rate}% VAT</span>}
-          {item.vat_amount != null && <span>{fmt(item.vat_amount)} VAT</span>}
+          {item.vat_rate   != null && <span>{item.vat_rate}% {t("preview.item_vat_inline")}</span>}
+          {item.vat_amount != null && <span>{fmt(item.vat_amount)} {t("preview.item_vat_inline")}</span>}
         </div>
       </div>
     );
@@ -103,14 +106,14 @@ function ItemRow({ item, editing, draft, onChange, onDelete, index }: {
       <div className="flex items-center gap-2">
         <span className="text-[10px] font-black text-black/30 font-mono w-4 shrink-0">{draft.position}.</span>
         <input value={draft.description} onChange={(e) => onChange("description", e.target.value)}
-          placeholder="Description"
+          placeholder={t("preview.item_placeholder_description")}
           className="flex-1 text-xs font-semibold text-black bg-white border border-amber-300 rounded px-2 py-1 outline-none focus:border-amber-500" />
         <button onClick={onDelete} className="shrink-0 text-black/30 hover:text-red-500 transition-colors">
           <Icon icon="mdi:trash-can-outline" className="w-3.5 h-3.5" />
         </button>
       </div>
       <div className="grid grid-cols-3 gap-1 pl-6">
-        {([["vat_rate","VAT %"],["vat_amount","VAT €"],["total_price","Total €"]] as [keyof DraftItem, string][]).map(([field, label]) => (
+        {([["vat_rate", t("preview.item_label_vat_pct")],["vat_amount", t("preview.item_label_vat_amt")],["total_price", t("preview.item_label_total")]] as [keyof DraftItem, string][]).map(([field, label]) => (
           <div key={field} className="flex flex-col gap-0.5">
             <span className="text-[9px] font-bold uppercase text-black/40">{label}</span>
             <input value={draft[field] as string} onChange={(e) => onChange(field, e.target.value)}
@@ -133,10 +136,11 @@ function VatSplitRow({ split, editing, draft, onChange, onDelete }: {
   onChange: (field: keyof DraftVatSplit, value: string) => void;
   onDelete: () => void;
 }) {
+  const { t } = useTranslation();
   if (!editing) {
     return (
       <div className="flex items-center gap-3 py-1.5 border-b border-black/10 last:border-0">
-        <span className="text-xs text-black/50 font-bold uppercase tracking-wider shrink-0 w-28">VAT {split.position}</span>
+        <span className="text-xs text-black/50 font-bold uppercase tracking-wider shrink-0 w-28">{t("preview.item_vat_inline")} {split.position}</span>
         <span className="flex-1 text-xs font-mono text-right text-black/70">
           {split.vat_rate != null ? `${split.vat_rate}%` : "—"}
           {split.vat_rate != null && split.vat_amount != null ? " · " : ""}
@@ -147,7 +151,7 @@ function VatSplitRow({ split, editing, draft, onChange, onDelete }: {
   }
   return (
     <div className="flex items-center gap-2 py-1.5 border-b border-black/10 last:border-0">
-      <span className="text-xs text-black/50 font-bold uppercase tracking-wider shrink-0 w-16">VAT {draft.position}</span>
+      <span className="text-xs text-black/50 font-bold uppercase tracking-wider shrink-0 w-16">{t("preview.item_vat_inline")} {draft.position}</span>
       <input value={draft.vat_rate} onChange={(e) => onChange("vat_rate", e.target.value)}
         placeholder="%" className="w-16 text-xs font-mono text-black bg-white border border-amber-300 rounded px-1.5 py-0.5 outline-none focus:border-amber-500" />
       <input value={draft.vat_amount} onChange={(e) => onChange("vat_amount", e.target.value)}
@@ -171,6 +175,7 @@ type VerifiedCp = {
 function VerifiedPicker({ apiBase, dbPath, onSelect }: {
   apiBase: string; dbPath?: string | null; onSelect: (cp: VerifiedCp) => void;
 }) {
+  const { t } = useTranslation();
   const [list, setList]       = useState<VerifiedCp[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen]       = useState(false);
@@ -190,15 +195,15 @@ function VerifiedPicker({ apiBase, dbPath, onSelect }: {
       <button onClick={() => setOpen((o) => !o)}
         className="flex items-center gap-1.5 text-[10px] font-bold text-black/60 hover:text-black uppercase tracking-wider transition-colors">
         <Icon icon="mdi:account-check-outline" className="w-3.5 h-3.5" />
-        Select from verified
+        {t("preview.select_from_verified")}
         <Icon icon={open ? "mdi:chevron-up" : "mdi:chevron-down"} className="w-3 h-3" />
       </button>
       {open && (
         <div className="mt-2 border border-black/10 rounded overflow-hidden">
           {loading ? (
-            <div className="px-3 py-2 text-xs text-black/30 font-mono">Loading…</div>
+            <div className="px-3 py-2 text-xs text-black/30 font-mono">{t("preview.loading")}</div>
           ) : list.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-black/30 font-mono">No verified counterparties yet</div>
+            <div className="px-3 py-2 text-xs text-black/30 font-mono">{t("preview.no_verified_counterparties")}</div>
           ) : list.map((cp) => (
             <button key={cp.id} onClick={() => { onSelect(cp); setOpen(false); }}
               className="w-full text-left px-3 py-2 hover:bg-amber-50 border-b border-black/5 last:border-0 transition-colors">
@@ -216,11 +221,12 @@ function VerifiedPicker({ apiBase, dbPath, onSelect }: {
 // Empty state
 // ---------------------------------------------------------------------------
 function EmptyState() {
+  const { t } = useTranslation();
   return (
     <aside className="w-[380px] shrink-0 bg-white border-l-2 border-red-500 flex flex-col items-center justify-center gap-3 p-8 text-center">
       <Icon icon="mdi:receipt-text-outline" className="w-16 h-16 text-black/10" />
       <p className="text-black/30 text-xs leading-relaxed font-mono">
-        Select a receipt from the sidebar<br />to preview it here.
+        {t("preview.empty").split("\n").map((line, i) => <span key={i}>{line}{i === 0 && <br />}</span>)}
       </p>
     </aside>
   );
@@ -230,6 +236,7 @@ function EmptyState() {
 // Main component
 // ---------------------------------------------------------------------------
 export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Props) {
+  const { t } = useTranslation();
   const [editing,          setEditing]          = useState(false);
   const [saving,           setSaving]           = useState(false);
   const [savedVisible,     setSavedVisible]     = useState(false);
@@ -408,7 +415,7 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
       setSavedVisible(true); setEditing(false); onSaved?.(updated);
       setTimeout(() => setSavedVisible(false), 3500);
     } catch (err: unknown) {
-      setSaveErr(err instanceof Error ? err.message : "Save failed.");
+      setSaveErr(err instanceof Error ? err.message : t("preview.save_failed"));
     } finally { setSaving(false); }
   };
 
@@ -417,14 +424,14 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
     <div className="flex items-center gap-1.5">
       {verifyConfirm ? (
         <span className="flex items-center gap-1.5 text-[10px] font-bold text-black">
-          Confirm verified?
+          {t("preview.confirm_verified")}
           <button onClick={() => doVerify(true)}
             className="text-[10px] font-black bg-black text-white px-1.5 py-0.5 rounded hover:bg-black/80 transition-colors">
-            Yes
+            {t("preview.yes")}
           </button>
           <button onClick={() => setVerifyConfirm(false)}
             className="text-[10px] font-black bg-white text-black border border-black/30 px-1.5 py-0.5 rounded hover:bg-black/5 transition-colors">
-            No
+            {t("preview.no")}
           </button>
         </span>
       ) : (
@@ -440,7 +447,7 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
               else doVerify(false);
             }}
           />
-          Verified
+          {t("preview.verified")}
         </label>
       )}
     </div>
@@ -457,27 +464,27 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
           <div className="flex items-center gap-2 mt-1 flex-wrap">
             <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded leading-none ${
               receipt.receipt_type === "sale" ? "bg-black text-amber-400" : "bg-black/15 text-black/70"
-            }`}>{receipt.receipt_type === "sale" ? "revenue" : "expense"}</span>
+            }`}>{receipt.receipt_type === "sale" ? t("preview.badge_revenue") : t("preview.badge_expense")}</span>
             <span className="text-xs font-bold uppercase tracking-wider text-black/60 flex items-center gap-1">
               {CATEGORY_META[receipt.category]?.icon && <Icon icon={CATEGORY_META[receipt.category].icon} className="w-3 h-3" />}
-              {CATEGORY_META[receipt.category]?.label ?? receipt.category}
+              {t(`sidebar.categories.${receipt.category}`, { defaultValue: receipt.category })}
             </span>
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {!editing ? (
-            <Tip label="Edit" pos="bottom">
+            <Tip label={t("preview.tip_edit")} pos="bottom">
               <button onClick={startEditing} className="bg-red-500 text-white p-1.5 rounded hover:bg-red-600 transition-colors">
                 <Icon icon="fe:edit" className="w-4 h-4" />
               </button>
             </Tip>
           ) : (
             <button onClick={cancelEditing} className="text-xs font-bold bg-white text-red-500 px-2.5 py-1 rounded border border-red-500 hover:bg-red-50 transition-colors">
-              Cancel
+              {t("preview.btn_cancel")}
             </button>
           )}
           {pdfOpen && (
-            <Tip label="Exit fullscreen" pos="bottom">
+            <Tip label={t("preview.tip_exit_fullscreen")} pos="bottom">
               <button onClick={() => setPdfOpen(false)} className="bg-black/10 hover:bg-black/20 text-black p-1.5 rounded transition-colors">
                 <Icon icon="mdi:fullscreen-exit" className="w-4 h-4" />
               </button>
@@ -489,12 +496,12 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
       {/* Status banners */}
       {receipt.duplicate && (
         <div className="mx-4 mt-3 px-3 py-2 bg-amber-50 border border-amber-300 rounded text-xs text-amber-700 font-mono flex items-center gap-2">
-          <Icon icon="mdi:alert-outline" className="w-3.5 h-3.5 shrink-0" /> Duplicate — already in DB
+          <Icon icon="mdi:alert-outline" className="w-3.5 h-3.5 shrink-0" /> {t("preview.duplicate_banner")}
         </div>
       )}
       {savedVisible && !editing && (
         <div className="mx-4 mt-3 px-3 py-2 bg-amber-50 border border-amber-300 rounded text-xs text-black font-mono flex items-center gap-2">
-          <Icon icon="mdi:check" className="w-3.5 h-3.5 shrink-0" /> Changes saved
+          <Icon icon="mdi:check" className="w-3.5 h-3.5 shrink-0" /> {t("preview.saved_banner")}
         </div>
       )}
       {saveErr && (
@@ -513,14 +520,14 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
               <Icon icon="mdi:fullscreen" className="w-4 h-4" />
             </button>
             <span className="pointer-events-none absolute right-0 top-full mt-1 whitespace-nowrap bg-black text-white text-[10px] font-bold px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity z-20">
-              Fullscreen
+              {t("preview.tip_fullscreen")}
             </span>
           </div>
         </div>
       )}
       {!pdfOpen && !pdfUrl && (
         <div className="shrink-0 bg-amber-50 border-b-2 border-amber-400 flex items-center justify-center gap-2 text-black/30 text-xs font-mono" style={{ height: 64 }}>
-          <Icon icon="mdi:file-pdf-box" className="w-4 h-4" /> No PDF available
+          <Icon icon="mdi:file-pdf-box" className="w-4 h-4" /> {t("preview.no_pdf")}
         </div>
       )}
 
@@ -530,18 +537,18 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
         {/* Counterparty */}
         <section>
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-black text-xs font-black uppercase tracking-wider">Counterparty</h3>
+            <h3 className="text-black text-xs font-black uppercase tracking-wider">{t("preview.section_counterparty")}</h3>
             {verifiedWidget}
           </div>
           <div className="border-2 border-black rounded px-3 py-1">
             {editing && <VerifiedPicker apiBase={apiBase} dbPath={dbPath} onSelect={applyVerifiedCp} />}
-            <FieldRow label="Name" value={counterpartyName}
+            <FieldRow label={t("preview.field_name")} value={counterpartyName}
               editing={editing} inputValue={draft.counterparty_name}
               onInput={(v) => setDraft((d) => ({ ...d, counterparty_name: v }))} />
-            <FieldRow label="VAT ID" value={receipt.counterparty?.vat_id ?? null}
+            <FieldRow label={t("preview.field_vat_id")} value={receipt.counterparty?.vat_id ?? null}
               editing={editing} inputValue={draft.vat_id}
               onInput={(v) => setDraft((d) => ({ ...d, vat_id: v }))} />
-            <FieldRow label="Steuernr." value={receipt.counterparty?.tax_number ?? null}
+            <FieldRow label={t("preview.field_tax_number")} value={receipt.counterparty?.tax_number ?? null}
               editing={editing} inputValue={draft.tax_number}
               onInput={(v) => setDraft((d) => ({ ...d, tax_number: v }))} />
             {/* Address toggle — same in view and edit */}
@@ -549,23 +556,23 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
               <button onClick={() => setAddrOpen((o) => !o)}
                 className="flex items-center gap-1 text-[10px] font-bold text-black/40 hover:text-black uppercase tracking-wider transition-colors">
                 <Icon icon={addrOpen ? "mdi:chevron-down" : "mdi:chevron-right"} className="w-3.5 h-3.5" />
-                Address
+                {t("preview.field_address")}
               </button>
             </div>
             {addrOpen && (<>
-              <FieldRow label="Street" value={receipt.counterparty?.address?.street}
+              <FieldRow label={t("preview.field_street")} value={receipt.counterparty?.address?.street}
                 editing={editing} inputValue={draft.address_street}
                 onInput={(v) => setDraft((d) => ({ ...d, address_street: v }))} />
-              <FieldRow label="No." value={receipt.counterparty?.address?.street_number}
+              <FieldRow label={t("preview.field_street_number")} value={receipt.counterparty?.address?.street_number}
                 editing={editing} inputValue={draft.address_street_number}
                 onInput={(v) => setDraft((d) => ({ ...d, address_street_number: v }))} />
-              <FieldRow label="Postcode" value={receipt.counterparty?.address?.postcode}
+              <FieldRow label={t("preview.field_postcode")} value={receipt.counterparty?.address?.postcode}
                 editing={editing} inputValue={draft.address_postcode}
                 onInput={(v) => setDraft((d) => ({ ...d, address_postcode: v }))} />
-              <FieldRow label="City" value={receipt.counterparty?.address?.city}
+              <FieldRow label={t("preview.field_city")} value={receipt.counterparty?.address?.city}
                 editing={editing} inputValue={draft.address_city}
                 onInput={(v) => setDraft((d) => ({ ...d, address_city: v }))} />
-              <FieldRow label="Country" value={receipt.counterparty?.address?.country}
+              <FieldRow label={t("preview.field_country")} value={receipt.counterparty?.address?.country}
                 editing={editing} inputValue={draft.address_country}
                 onInput={(v) => setDraft((d) => ({ ...d, address_country: v }))} />
             </>)}
@@ -574,30 +581,30 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
 
         {/* Receipt */}
         <section>
-          <h3 className="text-black text-xs font-black uppercase tracking-wider mb-2">Receipt</h3>
+          <h3 className="text-black text-xs font-black uppercase tracking-wider mb-2">{t("preview.section_receipt")}</h3>
           <div className="border-2 border-black rounded px-3 py-1">
-            <FieldRow label="Receipt #" value={receipt.receipt_number}
+            <FieldRow label={t("preview.field_receipt_number")} value={receipt.receipt_number}
               editing={editing} inputValue={draft.receipt_number}
               onInput={(v) => setDraft((d) => ({ ...d, receipt_number: v }))} />
-            <FieldRow label="Date" value={receipt.receipt_date}
+            <FieldRow label={t("preview.field_date")} value={receipt.receipt_date}
               editing={editing} inputValue={draft.receipt_date} placeholder="YYYY-MM-DD"
               onInput={(v) => setDraft((d) => ({ ...d, receipt_date: v }))} />
             {editing ? (
               <>
                 <div className="flex items-start justify-between gap-3 py-2 border-b border-black/10">
-                  <span className="text-xs text-black/50 font-bold uppercase tracking-wider shrink-0 w-28 pt-0.5">Type</span>
+                  <span className="text-xs text-black/50 font-bold uppercase tracking-wider shrink-0 w-28 pt-0.5">{t("preview.field_type")}</span>
                   <select value={draft.receipt_type} onChange={(e) => setDraft((d) => ({ ...d, receipt_type: e.target.value }))}
                     className="flex-1 min-w-0 text-xs font-mono text-black bg-amber-50 border border-amber-300 rounded px-2 py-1 outline-none focus:border-amber-500">
-                    <option value="purchase">Expense (purchase)</option>
-                    <option value="sale">Revenue (sale)</option>
+                    <option value="purchase">{t("preview.type_purchase")}</option>
+                    <option value="sale">{t("preview.type_sale")}</option>
                   </select>
                 </div>
                 <CategorySelect value={draft.category} onChange={(v) => setDraft((d) => ({ ...d, category: v }))} />
               </>
             ) : (
               <>
-                <FieldRow label="Type" value={receipt.receipt_type} />
-                <FieldRow label="Category" value={CATEGORY_META[receipt.category]?.label ?? receipt.category} />
+                <FieldRow label={t("preview.field_type")} value={receipt.receipt_type === "sale" ? t("preview.badge_revenue") : t("preview.badge_expense")} />
+                <FieldRow label={t("preview.field_category")} value={t(`sidebar.categories.${receipt.category}`, { defaultValue: receipt.category })} />
               </>
             )}
           </div>
@@ -605,14 +612,14 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
 
         {/* Amounts */}
         <section>
-          <h3 className="text-black text-xs font-black uppercase tracking-wider mb-2">Amounts</h3>
+          <h3 className="text-black text-xs font-black uppercase tracking-wider mb-2">{t("preview.section_amounts")}</h3>
           <div className="border-2 border-amber-400 rounded px-3 py-1 bg-amber-50">
-            <FieldRow label="Total" value={fmt(receipt.total_amount)}
+            <FieldRow label={t("preview.field_total")} value={fmt(receipt.total_amount)}
               editing={editing} inputValue={draft.total_amount}
               onInput={(v) => setDraft((d) => ({ ...d, total_amount: v }))} />
             {editing ? (
               <div className="py-2 border-b border-black/10 flex items-center justify-between">
-                <span className="text-xs text-black/50 font-bold uppercase tracking-wider">Split VAT</span>
+                <span className="text-xs text-black/50 font-bold uppercase tracking-wider">{t("preview.split_vat")}</span>
                 <button onClick={() => {
                     if (!splitVat && vatSplitDrafts.length === 0)
                       setVatSplitDrafts([
@@ -623,11 +630,11 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
                   }}
                   className={`text-[10px] font-bold px-2 py-0.5 rounded transition-colors ${
                     splitVat ? "bg-amber-400 text-black" : "bg-black/10 text-black/50 hover:bg-black/15"
-                  }`}>{splitVat ? "On" : "Off"}</button>
+                  }`}>{splitVat ? t("preview.split_on") : t("preview.split_off")}</button>
               </div>
             ) : receiptSplits.length > 0 && (
               <div className="py-1.5 border-b border-black/10">
-                <span className="text-[10px] font-bold text-black/40 uppercase tracking-wider">Split VAT</span>
+                <span className="text-[10px] font-bold text-black/40 uppercase tracking-wider">{t("preview.split_vat")}</span>
               </div>
             )}
             {!editing && receiptSplits.map((s, i) => (
@@ -644,20 +651,20 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
               ))}
               <div className="py-1.5">
                 <button onClick={addVatSplit} className="text-[10px] font-bold text-red-500 hover:text-red-700 flex items-center gap-1 transition-colors">
-                  <Icon icon="mdi:plus-circle-outline" className="w-3.5 h-3.5" /> Add VAT row
+                  <Icon icon="mdi:plus-circle-outline" className="w-3.5 h-3.5" /> {t("preview.add_vat_row")}
                 </button>
               </div>
             </>)}
             {(!editing || !splitVat) && receiptSplits.length === 0 && (<>
-              <FieldRow label="VAT %"
+              <FieldRow label={t("preview.field_vat_pct")}
                 value={receipt.vat_percentage != null ? `${receipt.vat_percentage}%` : null}
                 editing={editing} inputValue={draft.vat_percentage}
                 onInput={(v) => setDraft((d) => ({ ...d, vat_percentage: v }))} />
-              <FieldRow label="VAT amt" value={fmt(receipt.vat_amount)}
+              <FieldRow label={t("preview.field_vat_amt")} value={fmt(receipt.vat_amount)}
                 editing={editing} inputValue={draft.vat_amount}
                 onInput={(v) => setDraft((d) => ({ ...d, vat_amount: v }))} />
             </>)}
-            <FieldRow label="Net" value={fmt(receipt.net_amount)} />
+            <FieldRow label={t("preview.field_net")} value={fmt(receipt.net_amount)} />
           </div>
         </section>
 
@@ -666,20 +673,20 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
           <section>
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-black text-xs font-black uppercase tracking-wider">
-                Items {editing
+                {t("preview.section_items")} {editing
                   ? (itemDrafts.length > 0 ? `(${itemDrafts.length})` : "")
                   : (receipt.items?.length > 0 ? `(${receipt.items.length})` : "")}
               </h3>
               {editing && (
                 <button onClick={addItem} className="text-[10px] font-bold text-red-500 hover:text-red-700 flex items-center gap-1 transition-colors">
-                  <Icon icon="mdi:plus-circle-outline" className="w-3.5 h-3.5" /> Add item
+                  <Icon icon="mdi:plus-circle-outline" className="w-3.5 h-3.5" /> {t("preview.add_item")}
                 </button>
               )}
             </div>
             <div className="border-2 border-black rounded divide-y divide-black/10 overflow-hidden">
               {editing ? (
                 itemDrafts.length === 0 ? (
-                  <div className="px-3 py-3 text-xs text-black/30 font-mono text-center">No items</div>
+                  <div className="px-3 py-3 text-xs text-black/30 font-mono text-center">{t("preview.no_items")}</div>
                 ) : itemDrafts.map((d, i) => (
                   <div key={d.position}>
                     <ItemRow index={i}
@@ -689,10 +696,10 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
                       onDelete={() => setConfirmDeleteIdx(i)} />
                     {confirmDeleteIdx === i && (
                       <div className="px-3 py-2 bg-red-50 border-t border-red-200 flex items-center justify-between gap-2">
-                        <span className="text-xs text-red-600 font-bold">Delete item {d.position}?</span>
+                        <span className="text-xs text-red-600 font-bold">{t("preview.delete_item", { pos: d.position })}</span>
                         <div className="flex gap-2">
-                          <button onClick={() => deleteItem(i)} className="text-[11px] font-black bg-red-500 text-white px-2 py-0.5 rounded hover:bg-red-600 transition-colors">Yes</button>
-                          <button onClick={() => setConfirmDeleteIdx(null)} className="text-[11px] font-black bg-white text-red-500 border border-red-400 px-2 py-0.5 rounded hover:bg-red-50 transition-colors">No</button>
+                          <button onClick={() => deleteItem(i)} className="text-[11px] font-black bg-red-500 text-white px-2 py-0.5 rounded hover:bg-red-600 transition-colors">{t("preview.yes")}</button>
+                          <button onClick={() => setConfirmDeleteIdx(null)} className="text-[11px] font-black bg-white text-red-500 border border-red-400 px-2 py-0.5 rounded hover:bg-red-50 transition-colors">{t("preview.no")}</button>
                         </div>
                       </div>
                     )}
@@ -721,8 +728,8 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
           <button onClick={handleSave} disabled={saving}
             className="w-full bg-red-500 hover:bg-red-600 disabled:opacity-40 text-white font-bold text-sm py-2 rounded border border-red-700 transition-colors flex items-center justify-center gap-2">
             {saving
-              ? <><Icon icon="svg-spinners:12-dots-scale-rotate" className="w-4 h-4" /> Saving…</>
-              : <><Icon icon="mdi:content-save-outline" className="w-4 h-4" /> Save</>
+              ? <><Icon icon="svg-spinners:12-dots-scale-rotate" className="w-4 h-4" /> {t("preview.btn_saving")}</>
+              : <><Icon icon="mdi:content-save-outline" className="w-4 h-4" /> {t("preview.btn_save")}</>
             }
           </button>
         </div>
@@ -737,7 +744,7 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
         {/* PDF side */}
         <div className="flex-1 min-w-0 flex flex-col">
           <div className="px-3 py-2 bg-black border-b border-white/10 shrink-0 flex items-center justify-between">
-            <span className="text-white/40 text-[10px] font-mono uppercase tracking-wider">Receipt PDF</span>
+            <span className="text-white/40 text-[10px] font-mono uppercase tracking-wider">{t("preview.pdf_label")}</span>
           </div>
           <iframe src={pdfUrl} className="flex-1" title="Receipt PDF fullscreen" />
         </div>

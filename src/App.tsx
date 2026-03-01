@@ -98,7 +98,7 @@ export default function App() {
           period={period}
           onPeriodChange={setPeriod}
         />
-        <Dashboard receipts={visibleReceipts} />
+        <Dashboard receipts={visibleReceipts} period={period} />
         <PreviewPanel
           receipt={selected}
           apiBase={API_BASE}
