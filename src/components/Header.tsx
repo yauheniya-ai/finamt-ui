@@ -50,10 +50,10 @@ export default function Header({ apiBase, activeDb, onDbSelect, onLanguageChange
           <button
             onClick={copy}
             title="Copy to clipboard"
-            className="text-black/40 hover:text-black transition-colors"
+            className="text-black/30 hover:text-black transition-colors"
           >
             {copied ? (
-              <svg className="w-3.5 h-3.5 text-black/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
               </svg>
             ) : (

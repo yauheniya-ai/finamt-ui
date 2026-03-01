@@ -158,5 +158,31 @@
     "count_invoices_plural": "{{n}} Rechnungen",
     "count_receipts": "{{n}} Beleg",
     "count_receipts_plural": "{{n}} Belege"
+  },
+  "db": {
+    "title": "Projekt wählen",
+    "switch": "Projekt wechseln",
+    "default": "Standard",
+    "scanning": "Suche…",
+    "no_projects": "Keine Projekte in ~/.finanzamt/ gefunden.",
+    "receipts": "Belege",
+    "badge_default": "Standard",
+    "badge_active": "aktiv",
+    "badge_empty": "leer",
+    "refresh": "Aktualisieren",
+    "add_project": "Projekt hinzufügen",
+    "reset_default": "Auswahl aufheben",
+    "delete": "Projekt löschen",
+    "confirm_delete": "Projekt „{{name}}“ löschen?",
+    "confirm_yes": "Löschen",
+    "confirm_no": "Abbrechen",
+    "new_project_label": "Neuer Projektname",
+    "new_project_placeholder": "projekt-name",
+    "name_hint": "Kleinbuchstaben, Ziffern, Bindestriche und Unterstriche.",
+    "create": "Erstellen",
+    "creating": "Erstelle…",
+    "error_load": "Server nicht erreichbar.",
+    "error_create": "Projekt konnte nicht erstellt werden.",
+    "error_delete": "Projekt konnte nicht gelöscht werden."
   }
 }

@@ -158,5 +158,31 @@
     "count_invoices_plural": "{{n}} invoices",
     "count_receipts": "{{n}} receipt",
     "count_receipts_plural": "{{n}} receipts"
+  },
+  "db": {
+    "title": "Select Project",
+    "switch": "Switch project",
+    "default": "default",
+    "scanning": "Scanning…",
+    "no_projects": "No projects found in ~/.finanzamt/",
+    "receipts": "receipts",
+    "badge_default": "default",
+    "badge_active": "active",
+    "badge_empty": "empty",
+    "refresh": "Refresh",
+    "add_project": "Add project",
+    "reset_default": "Clear selection",
+    "delete": "Delete project",
+    "confirm_delete": "Delete project \"{{name}}\"?",
+    "confirm_yes": "Delete",
+    "confirm_no": "Cancel",
+    "new_project_label": "New project name",
+    "new_project_placeholder": "project-name",
+    "name_hint": "Lowercase letters, digits, hyphens and underscores.",
+    "create": "Create",
+    "creating": "Creating…",
+    "error_load": "Could not reach server.",
+    "error_create": "Could not create project.",
+    "error_delete": "Could not delete project."
   }
 }
