@@ -2,6 +2,7 @@ import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import type { Receipt, PeriodFilter } from "./Sidebar";
 import { CATEGORY_META, fmt } from "./Sidebar";
+import type { CategoryMeta } from "./Sidebar";
 
 type Props = { receipts: Receipt[]; period: PeriodFilter };
 
@@ -42,7 +43,7 @@ function CategoryChart({ title, totals }: { title: string; totals: Record<string
         <div className="flex flex-col gap-3">
           {sorted.map(([cat, total]) => {
             const pct  = Math.round((total / max) * 100);
-            const meta = CATEGORY_META[cat];
+            const meta = CATEGORY_META[cat] as CategoryMeta | undefined;
             return (
               <div key={cat} className="flex items-center gap-3">
                 <span className="text-xs text-black/70 font-bold w-36 capitalize shrink-0 flex items-center gap-1.5 truncate">

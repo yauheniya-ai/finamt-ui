@@ -41,14 +41,18 @@ export default function App() {
       );
       if (!res.ok) throw new Error((await res.json()).detail ?? "Upload failed.");
       const receipt: Receipt = await res.json();
-      setReceipts((prev) => (prev.find((r) => r.id === receipt.id) ? prev : [...prev, receipt]));
+      // Refetch the full list so the sidebar reflects the real DB state
+      // (avoids period-filter edge cases with optimistic state patches)
+      const listRes = await fetch(`${API_BASE}/receipts${dbQs}`);
+      const listData = await listRes.json();
+      setReceipts(listData.receipts ?? []);
       setSelected(receipt);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Upload failed.");
     } finally {
       setUploading(false);
     }
-  }, [activeDb]);
+  }, [activeDb, dbQs]);
 
   const handleDelete = useCallback(async (id: string) => {
     try {

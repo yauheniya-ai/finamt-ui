@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import i18n from "../i18n";
 import { Icon } from "@iconify/react";
+import { CATEGORY_META, REVENUE_CATS } from "../constants";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -34,6 +35,9 @@ export type ReceiptItem = {
   category:    string;
 };
 
+export { CATEGORY_META } from "../constants";
+export type { CategoryMeta } from "../constants";
+
 export type Receipt = {
   id:             string;
   receipt_type:   "purchase" | "sale";
@@ -56,28 +60,7 @@ export type Receipt = {
 // Shared metadata
 // ---------------------------------------------------------------------------
 
-export const CATEGORY_META: Record<string, { label: string; icon: string }> = {
-  // ── Revenue categories (sales) ──────────────────────────────────────────
-  services:          { label: "services",   icon: "mdi:briefcase" },
-  consulting:        { label: "consulting", icon: "mdi:head-lightbulb-outline" },
-  products:          { label: "products",   icon: "mdi:package-variant-closed" },
-  licensing:         { label: "licensing",  icon: "mdi:file-certificate-outline" },
-  // ── Expense categories (purchases) ──────────────────────────────────────
-  material:          { label: "material",  icon: "solar:box-bold" },
-  equipment:         { label: "equipment",  icon: "teenyicons:computer-outline" },
-  software:          { label: "software",   icon: "heroicons:cpu-chip-16-solid" },
-  internet:          { label: "internet",   icon: "mdi:internet" },
-  telecommunication: { label: "telecommunication",    icon: "streamline-flex:satellite-dish-solid" },
-  travel:            { label: "travel",     icon: "mdi:airplane" },
-  education:         { label: "education",  icon: "wpf:books" },
-  utilities:         { label: "utilities",  icon: "roentgen:electricity" },
-  insurance:         { label: "insurance",  icon: "carbon:manage-protection" },
-  taxes:             { label: "taxes",      icon: "boxicons:bank-filled" },
-  other:             { label: "other",      icon: "flowbite:folder-plus-solid" },
-};
-
-// Revenue-side categories — used to split sidebar sections
-const REVENUE_CATS = new Set(["services", "consulting", "products", "licensing"]);
+// CATEGORY_META and REVENUE_CATS are imported from ../constants
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -323,7 +306,9 @@ export default function Sidebar({
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   const grouped = receipts.reduce<Record<string, Receipt[]>>((acc, r) => {
-    (acc[r.category] ??= []).push(r);
+    // Normalize any category not in CATEGORY_META to "other" so it always renders
+    const cat = r.category in CATEGORY_META ? r.category : "other";
+    (acc[cat] ??= []).push(r);
     return acc;
   }, {});
 
@@ -528,6 +513,8 @@ export default function Sidebar({
           <>
             <SectionDivider label={t("sidebar.expenses")} count={purchases.length} total={purchaseTotal} isRevenue={false} />
             {expenseCats.map(([cat, meta]) => renderGroup(cat, meta, "purchase"))}
+            {/* Purchase receipts that fell into revenue categories (e.g. "services" bought) */}
+            {revenueCats.map(([cat, meta]) => renderGroup(cat, meta, "purchase"))}
           </>
         )}
 

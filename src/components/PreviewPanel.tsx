@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Icon } from "@iconify/react";
 import type { Receipt, ReceiptItem } from "./Sidebar";
 import { fmt, CATEGORY_META } from "./Sidebar";
+import type { CategoryMeta } from "./Sidebar";
 import { useTranslation } from "react-i18next";
 
 type Props = {
@@ -63,7 +64,7 @@ function CategorySelect({ value, onChange }: { value: string; onChange: (v: stri
       <span className="text-xs text-black/50 font-bold uppercase tracking-wider shrink-0 w-28 pt-0.5">{t("preview.field_category")}</span>
       <select value={value} onChange={(e) => onChange(e.target.value)}
         className="flex-1 min-w-0 text-xs text-black font-mono bg-amber-50 border border-amber-300 rounded px-2 py-1 outline-none focus:border-amber-500">
-        {Object.entries(CATEGORY_META).map(([k, v]) => (
+        {(Object.entries(CATEGORY_META) as [string, CategoryMeta][]).map(([k, v]) => (
           <option key={k} value={k}>{t(`sidebar.categories.${k}`, { defaultValue: v.label })}</option>
         ))}
       </select>
@@ -235,6 +236,12 @@ function EmptyState() {
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
+// Returns true if the url points to a PDF (used to decide iframe vs img)
+function isPdf(url: string | null): boolean {
+  if (!url) return false;
+  return url.split("?")[0].toLowerCase().endsWith("/pdf") || url.includes("application/pdf");
+}
+
 export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Props) {
   const { t } = useTranslation();
   const [editing,          setEditing]          = useState(false);
@@ -513,7 +520,10 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
       {/* PDF thumbnail — hidden in fullscreen (PDF is full-width on left) */}
       {!pdfOpen && pdfUrl && (
         <div className="relative shrink-0 border-b-2 border-amber-400" style={{ height: 280 }}>
-          <iframe src={pdfUrl} className="w-full h-full bg-amber-50" title="Receipt PDF" />
+          {isPdf(pdfUrl)
+            ? <iframe src={pdfUrl} className="w-full h-full bg-amber-50" title="Receipt PDF" />
+            : <img src={pdfUrl} className="w-full h-full object-contain bg-amber-50" alt="Receipt" />
+          }
           <div className="absolute top-2 right-2 group">
             <button onClick={() => setPdfOpen(true)}
               className="bg-black/70 hover:bg-black text-white rounded p-1.5 transition-colors">
@@ -746,7 +756,14 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
           <div className="px-3 py-2 bg-black border-b border-white/10 shrink-0 flex items-center justify-between">
             <span className="text-white/40 text-[10px] font-mono uppercase tracking-wider">{t("preview.pdf_label")}</span>
           </div>
-          <iframe src={pdfUrl} className="flex-1" title="Receipt PDF fullscreen" />
+          {isPdf(pdfUrl)
+            ? <iframe src={pdfUrl} className="flex-1" title="Receipt PDF fullscreen" />
+            : (
+              <div className="flex-1 flex items-center justify-center bg-black overflow-hidden">
+                <img src={pdfUrl} className="max-h-full max-w-full object-contain" alt="Receipt fullscreen" />
+              </div>
+            )
+          }
         </div>
         {/* Data panel — same as normal, full editing available */}
         {panelContent(true)}
