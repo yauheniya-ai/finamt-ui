@@ -268,15 +268,20 @@ export default function Dashboard({ receipts, period }: Props) {
         </table>
       </div>
 
-      {/* Placeholder tiles */}
+      {/* Tax return tiles */}
       <div className="grid grid-cols-2 gap-3">
         {([
-          ["tile_monthly_trend", "tile_forecast"],
-        ][0]).map((key) => (
+          { key: "eur", icon: "mdi:calculator-variant-outline" },
+          { key: "ust", icon: "mdi:file-percent-outline" },
+          { key: "est", icon: "mdi:account-cash-outline" },
+          { key: "gst", icon: "mdi:domain" },
+        ]).map(({ key, icon }) => (
           <div key={key}
             className="bg-white border-2 border-amber-400 border-dashed rounded p-6 flex flex-col items-center justify-center gap-2 text-center">
-            <span className="text-black/70 text-sm font-black uppercase tracking-wider">{t(`dashboard.${key}`)}</span>
-            <span className="text-black/70 text-xs font-mono">{t("dashboard.coming_soon")}</span>
+            <Icon icon={icon} className="w-7 h-7 text-black/20" />
+            <span className="text-black/70 text-sm font-black uppercase tracking-wider">{t(`dashboard.tile_${key}_title`)}</span>
+            <span className="text-black/40 text-[10px] font-mono">{t(`dashboard.tile_${key}_sub`)}</span>
+            <span className="text-black/40 text-xs font-mono">{t("dashboard.coming_soon")}</span>
           </div>
         ))}
       </div>

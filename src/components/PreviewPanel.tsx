@@ -19,10 +19,11 @@ const qs = (dbPath?: string | null) =>
 // Tooltip
 // ---------------------------------------------------------------------------
 function Tip({ label, children, pos = "bottom" }: {
-  label: string; children: React.ReactNode; pos?: "bottom" | "top" | "left";
+  label: string; children: React.ReactNode; pos?: "bottom" | "top" | "left" | "bottom-right";
 }) {
   const posClass = pos === "top" ? "bottom-full mb-1 right-0"
     : pos === "left" ? "right-full mr-1 top-1/2 -translate-y-1/2"
+    : pos === "bottom-right" ? "top-full mt-1 left-0"
     : "top-full mt-1 right-0";
   return (
     <div className="relative group">
@@ -754,12 +755,18 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
         {/* PDF side */}
         <div className="flex-1 min-w-0 flex flex-col">
           <div className="px-3 py-2 bg-black border-b border-white/10 shrink-0 flex items-center justify-between">
-            <span className="text-white/40 text-[10px] font-mono uppercase tracking-wider">{t("preview.pdf_label")}</span>
+            <div className="flex items-center gap-2">
+              <Tip label={t("preview.tip_exit_fullscreen")} pos="bottom-right">
+                <button onClick={() => setPdfOpen(false)} className="text-white/50 hover:text-white transition-colors p-0.5 rounded">
+                  <Icon icon="mdi:arrow-left" className="w-4 h-4" />
+                </button>
+              </Tip>
+            </div>
           </div>
           {isPdf(pdfUrl)
             ? <iframe src={pdfUrl} className="flex-1" title="Receipt PDF fullscreen" />
             : (
-              <div className="flex-1 flex items-center justify-center bg-black overflow-hidden">
+              <div className="flex-1 min-h-0 flex items-center justify-center bg-black overflow-hidden">
                 <img src={pdfUrl} className="max-h-full max-w-full object-contain" alt="Receipt fullscreen" />
               </div>
             )
