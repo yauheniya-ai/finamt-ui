@@ -171,7 +171,7 @@ function VatSplitRow({ split, editing, draft, onChange, onDelete }: {
 type VerifiedCp = {
   id: string; name: string | null; tax_number: string | null; vat_id: string | null;
   verified: boolean;
-  address: { street: string | null; street_number: string | null; postcode: string | null; city: string | null; country: string | null };
+  address: { street_and_number: string | null; postcode: string | null; city: string | null; state: string | null; country: string | null };
 };
 
 function VerifiedPicker({ apiBase, dbPath, onSelect }: {
@@ -259,8 +259,8 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
   const [localVerified,    setLocalVerified]    = useState<boolean | null>(null);
   const [draft, setDraft] = useState<Record<string, string>>({
     counterparty_name: "", vat_id: "", tax_number: "",
-    address_street: "", address_street_number: "", address_postcode: "",
-    address_city: "", address_country: "",
+    address_street_and_number: "", address_postcode: "",
+    address_city: "", address_state: "", address_country: "",
     receipt_number: "", receipt_date: "", receipt_type: "purchase",
     total_amount: "", vat_percentage: "", vat_amount: "", category: "",
   });
@@ -288,14 +288,14 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
   const startEditing = () => {
     const addr = receipt.counterparty?.address;
     setDraft({
-      counterparty_name:     counterpartyName ?? "",
-      vat_id:                receipt.counterparty?.vat_id     ?? "",
-      tax_number:            receipt.counterparty?.tax_number ?? "",
-      address_street:        addr?.street        ?? "",
-      address_street_number: addr?.street_number ?? "",
-      address_postcode:      addr?.postcode      ?? "",
-      address_city:          addr?.city          ?? "",
-      address_country:       addr?.country       ?? "",
+      counterparty_name:        counterpartyName ?? "",
+      vat_id:                   receipt.counterparty?.vat_id     ?? "",
+      tax_number:               receipt.counterparty?.tax_number ?? "",
+      address_street_and_number: addr?.street_and_number ?? "",
+      address_postcode:         addr?.postcode      ?? "",
+      address_city:             addr?.city          ?? "",
+      address_state:            addr?.state         ?? "",
+      address_country:          addr?.country       ?? "",
       receipt_number:        receipt.receipt_number  ?? "",
       receipt_date:          receipt.receipt_date    ?? "",
       receipt_type:          receipt.receipt_type    ?? "purchase",
@@ -354,14 +354,14 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
   const applyVerifiedCp = (cp: VerifiedCp) => {
     setDraft((d) => ({
       ...d,
-      counterparty_name:     cp.name                  ?? d.counterparty_name,
-      vat_id:                cp.vat_id                ?? d.vat_id,
-      tax_number:            cp.tax_number            ?? d.tax_number,
-      address_street:        cp.address?.street        ?? d.address_street,
-      address_street_number: cp.address?.street_number ?? d.address_street_number,
-      address_postcode:      cp.address?.postcode      ?? d.address_postcode,
-      address_city:          cp.address?.city          ?? d.address_city,
-      address_country:       cp.address?.country       ?? d.address_country,
+      counterparty_name:        cp.name                      ?? d.counterparty_name,
+      vat_id:                   cp.vat_id                    ?? d.vat_id,
+      tax_number:               cp.tax_number                ?? d.tax_number,
+      address_street_and_number: cp.address?.street_and_number ?? d.address_street_and_number,
+      address_postcode:         cp.address?.postcode          ?? d.address_postcode,
+      address_city:             cp.address?.city              ?? d.address_city,
+      address_state:            cp.address?.state             ?? d.address_state,
+      address_country:          cp.address?.country           ?? d.address_country,
     }));
     setLocalVerified(true);
   };
@@ -394,8 +394,8 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
       if (draft.tax_number) payload.tax_number = draft.tax_number;
       if (localVerified !== null) payload.counterparty_verified = localVerified;
       const addr: Record<string, string> = {};
-      (["street","street_number","postcode","city","country"] as const).forEach((k, i) => {
-        const v = draft[["address_street","address_street_number","address_postcode","address_city","address_country"][i]];
+      (["street_and_number","postcode","city","state","country"] as const).forEach((k, i) => {
+        const v = draft[["address_street_and_number","address_postcode","address_city","address_state","address_country"][i]];
         if (v) addr[k] = v;
       });
       if (Object.keys(addr).length) payload["address"] = addr;
@@ -571,18 +571,18 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
               </button>
             </div>
             {addrOpen && (<>
-              <FieldRow label={t("preview.field_street")} value={receipt.counterparty?.address?.street}
-                editing={editing} inputValue={draft.address_street}
-                onInput={(v) => setDraft((d) => ({ ...d, address_street: v }))} />
-              <FieldRow label={t("preview.field_street_number")} value={receipt.counterparty?.address?.street_number}
-                editing={editing} inputValue={draft.address_street_number}
-                onInput={(v) => setDraft((d) => ({ ...d, address_street_number: v }))} />
+              <FieldRow label={t("preview.field_street_and_number")} value={receipt.counterparty?.address?.street_and_number}
+                editing={editing} inputValue={draft.address_street_and_number}
+                onInput={(v) => setDraft((d) => ({ ...d, address_street_and_number: v }))} />
               <FieldRow label={t("preview.field_postcode")} value={receipt.counterparty?.address?.postcode}
                 editing={editing} inputValue={draft.address_postcode}
                 onInput={(v) => setDraft((d) => ({ ...d, address_postcode: v }))} />
               <FieldRow label={t("preview.field_city")} value={receipt.counterparty?.address?.city}
                 editing={editing} inputValue={draft.address_city}
                 onInput={(v) => setDraft((d) => ({ ...d, address_city: v }))} />
+              <FieldRow label={t("preview.field_state")} value={receipt.counterparty?.address?.state}
+                editing={editing} inputValue={draft.address_state}
+                onInput={(v) => setDraft((d) => ({ ...d, address_state: v }))} />
               <FieldRow label={t("preview.field_country")} value={receipt.counterparty?.address?.country}
                 editing={editing} inputValue={draft.address_country}
                 onInput={(v) => setDraft((d) => ({ ...d, address_country: v }))} />
