@@ -164,6 +164,7 @@ type Props = {
   onUpload:        (file: File, type: "purchase" | "sale") => void;
   onDelete:        (id: string) => void;
   uploading:       boolean;
+  progressStep?:   string | null;
   error?:          string | null;
   period:          PeriodFilter;
   onPeriodChange:  (p: PeriodFilter) => void;
@@ -294,7 +295,7 @@ function SectionDivider({ label, count, total, isRevenue }: { label: string; cou
 // MONTHS rendered via t("sidebar.months") array
 
 export default function Sidebar({
-  receipts, selectedId, onSelect, onUpload, onDelete, uploading, error,
+  receipts, selectedId, onSelect, onUpload, onDelete, uploading, progressStep, error,
   period, onPeriodChange,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -390,7 +391,7 @@ export default function Sidebar({
           {uploading ? (
             <>
               <Icon icon="svg-spinners:12-dots-scale-rotate" className="w-4 h-4" />
-              {t("sidebar.processing")}
+              {progressStep ?? "..."}
             </>
           ) : (
             <>

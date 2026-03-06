@@ -12,6 +12,7 @@ export default function App() {
   const [receipts,  setReceipts]  = useState<Receipt[]>([]);
   const [selected,  setSelected]  = useState<Receipt | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [progressStep, setProgressStep] = useState<string | null>(null);
   const [error,     setError]     = useState<string | null>(null);
   const [activeDb,  setActiveDb]  = useState<string | null>(null);
   const [period,    setPeriod]    = useState<PeriodFilter>(DEFAULT_PERIOD);
@@ -31,26 +32,59 @@ export default function App() {
 
   const handleUpload = useCallback(async (file: File, type: "purchase" | "sale" = "purchase") => {
     setUploading(true);
+    setProgressStep(null);
     setError(null);
     try {
       const body = new FormData();
       body.append("file", file);
-      const res = await fetch(
-        `${API_BASE}/receipts/upload?receipt_type=${type}${activeDb ? `&db=${encodeURIComponent(activeDb)}` : ""}`,
-        { method: "POST", body }
-      );
-      if (!res.ok) throw new Error((await res.json()).detail ?? "Upload failed.");
-      const receipt: Receipt = await res.json();
-      // Refetch the full list so the sidebar reflects the real DB state
-      // (avoids period-filter edge cases with optimistic state patches)
-      const listRes = await fetch(`${API_BASE}/receipts${dbQs}`);
-      const listData = await listRes.json();
-      setReceipts(listData.receipts ?? []);
-      setSelected(receipt);
+      const url = `${API_BASE}/receipts/upload/stream?receipt_type=${type}${activeDb ? `&db=${encodeURIComponent(activeDb)}` : ""}`;
+      const res = await fetch(url, { method: "POST", body });
+      if (!res.ok || !res.body) throw new Error((await res.json()).detail ?? "Upload failed.");
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      let receipt: Receipt | null = null;
+
+      outer: while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const parts = buf.split("\n\n");
+        buf = parts.pop() ?? "";
+        for (const part of parts) {
+          const lines = part.split("\n");
+          let eventType = "message";
+          let data = "";
+          for (const line of lines) {
+            if (line.startsWith("event: ")) eventType = line.slice(7).trim();
+            else if (line.startsWith("data: ")) data = line.slice(6).trim();
+          }
+          if (eventType === "progress") {
+            const msg: string = JSON.parse(data);
+            // Only surface the steps the user cares about
+            const m = msg.match(/→\s+(PyMuPDF|PaddleOCR|Tesseract|Agent\s+[1-4])/);
+            if (m) setProgressStep(m[1].replace(/\s+/, " ") + "...");
+          } else if (eventType === "result") {
+            receipt = JSON.parse(data) as Receipt;
+            break outer;
+          } else if (eventType === "error") {
+            throw new Error(JSON.parse(data));
+          }
+        }
+      }
+
+      if (receipt) {
+        const listRes = await fetch(`${API_BASE}/receipts${dbQs}`);
+        const listData = await listRes.json();
+        setReceipts(listData.receipts ?? []);
+        setSelected(receipt);
+      }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Upload failed.");
     } finally {
       setUploading(false);
+      setProgressStep(null);
     }
   }, [activeDb, dbQs]);
 
@@ -98,6 +132,7 @@ export default function App() {
           onUpload={handleUpload}
           onDelete={handleDelete}
           uploading={uploading}
+          progressStep={progressStep}
           error={null}
           period={period}
           onPeriodChange={setPeriod}
