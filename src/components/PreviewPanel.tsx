@@ -130,10 +130,10 @@ function ItemRow({ item, editing, draft, onChange, onDelete, index }: {
 // ---------------------------------------------------------------------------
 // VatSplitRow
 // ---------------------------------------------------------------------------
-type DraftVatSplit = { position: number; vat_rate: string; vat_amount: string };
+type DraftVatSplit = { position: number; vat_rate: string; vat_amount: string; net_amount: string };
 
 function VatSplitRow({ split, editing, draft, onChange, onDelete }: {
-  split: { position: number; vat_rate: number | null; vat_amount: number | null };
+  split: { position: number; vat_rate: number | null; vat_amount: number | null; net_amount: number | null };
   editing: boolean; draft: DraftVatSplit;
   onChange: (field: keyof DraftVatSplit, value: string) => void;
   onDelete: () => void;
@@ -144,9 +144,11 @@ function VatSplitRow({ split, editing, draft, onChange, onDelete }: {
       <div className="flex items-center gap-3 py-1.5 border-b border-black/10 last:border-0">
         <span className="text-xs text-black/50 font-bold uppercase tracking-wider shrink-0 w-28">{t("preview.item_vat_inline")} {split.position}</span>
         <span className="flex-1 text-xs font-mono text-right text-black/70">
-          {split.vat_rate != null ? `${split.vat_rate}%` : "—"}
-          {split.vat_rate != null && split.vat_amount != null ? " · " : ""}
-          {split.vat_amount != null ? fmt(split.vat_amount) : ""}
+          {split.vat_amount != null ? fmt(split.vat_amount) : "—"}
+          {split.vat_amount != null && split.vat_rate != null ? " · " : ""}
+          {split.vat_rate != null ? `${split.vat_rate}%` : ""}
+          {split.vat_rate != null && split.net_amount != null ? " · " : ""}
+          {split.net_amount != null ? fmt(split.net_amount) : ""}
         </span>
       </div>
     );
@@ -154,11 +156,22 @@ function VatSplitRow({ split, editing, draft, onChange, onDelete }: {
   return (
     <div className="flex items-center gap-2 py-1.5 border-b border-black/10 last:border-0">
       <span className="text-xs text-black/50 font-bold uppercase tracking-wider shrink-0 w-16">{t("preview.item_vat_inline")} {draft.position}</span>
-      <input value={draft.vat_rate} onChange={(e) => onChange("vat_rate", e.target.value)}
-        placeholder="%" className="w-16 text-xs font-mono text-black bg-white border border-amber-300 rounded px-1.5 py-0.5 outline-none focus:border-amber-500" />
-      <input value={draft.vat_amount} onChange={(e) => onChange("vat_amount", e.target.value)}
-        placeholder="€" className="flex-1 text-xs font-mono text-black bg-white border border-amber-300 rounded px-1.5 py-0.5 outline-none focus:border-amber-500" />
-      <button onClick={onDelete} className="shrink-0 text-black/30 hover:text-red-500 transition-colors">
+      <label className="flex-1 flex flex-col gap-0.5 min-w-0">
+        <span className="text-[9px] font-bold text-black/40 uppercase tracking-wider">{t("preview.split_vat_amt")}</span>
+        <input value={draft.vat_amount} onChange={(e) => onChange("vat_amount", e.target.value)}
+          placeholder="0.00" className="w-full text-xs font-mono text-black bg-white border border-amber-300 rounded px-1.5 py-0.5 outline-none focus:border-amber-500" />
+      </label>
+      <label className="flex-1 flex flex-col gap-0.5 min-w-0">
+        <span className="text-[9px] font-bold text-black/40 uppercase tracking-wider">{t("preview.split_rate")}</span>
+        <input value={draft.vat_rate} onChange={(e) => onChange("vat_rate", e.target.value)}
+          placeholder="0" className="w-full text-xs font-mono text-black bg-white border border-amber-300 rounded px-1.5 py-0.5 outline-none focus:border-amber-500" />
+      </label>
+      <label className="flex-1 flex flex-col gap-0.5 min-w-0">
+        <span className="text-[9px] font-bold text-black/40 uppercase tracking-wider">{t("preview.split_net")}</span>
+        <input value={draft.net_amount} onChange={(e) => onChange("net_amount", e.target.value)}
+          placeholder="0.00" className="w-full text-xs font-mono text-black bg-white border border-amber-300 rounded px-1.5 py-0.5 outline-none focus:border-amber-500" />
+      </label>
+      <button onClick={onDelete} className="shrink-0 text-black/30 hover:text-red-500 transition-colors mt-3.5">
         <Icon icon="mdi:trash-can-outline" className="w-3.5 h-3.5" />
       </button>
     </div>
@@ -278,7 +291,7 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
 
   const counterpartyName = receipt.vendor ?? receipt.counterparty?.name ?? null;
   const pdfUrl = receipt.pdf_url ? `${apiBase}${receipt.pdf_url}${qs(dbPath)}` : null;
-  const receiptSplits = ((receipt as Receipt & { vat_splits?: { position: number; vat_rate: number | null; vat_amount: number | null }[] }).vat_splits ?? []);
+  const receiptSplits = ((receipt as Receipt & { vat_splits?: { position: number; vat_rate: number | null; vat_amount: number | null; net_amount: number | null }[] }).vat_splits ?? []);
   const cpVerifiedFromReceipt = !!(receipt.counterparty as (typeof receipt.counterparty & { verified?: boolean }))?.verified;
   const isVerified = localVerified !== null ? localVerified : cpVerifiedFromReceipt;
   const cpId = receipt.counterparty?.id ?? null;
@@ -320,6 +333,7 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
         position: s.position ?? i + 1,
         vat_rate: s.vat_rate?.toString() ?? "",
         vat_amount: s.vat_amount?.toString() ?? "",
+        net_amount: s.net_amount?.toString() ?? "",
       })));
     } else {
       setSplitVat(false); setVatSplitDrafts([]);
@@ -346,7 +360,7 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
     setVatSplitDrafts((prev) => prev.map((d, idx) => idx === i ? { ...d, [field]: value } : d));
 
   const addVatSplit = () =>
-    setVatSplitDrafts((prev) => [...prev, { position: prev.length + 1, vat_rate: "", vat_amount: "" }]);
+    setVatSplitDrafts((prev) => [...prev, { position: prev.length + 1, vat_rate: "", vat_amount: "", net_amount: "" }]);
 
   const deleteVatSplit = (i: number) =>
     setVatSplitDrafts((prev) => prev.filter((_, idx) => idx !== i).map((d, idx) => ({ ...d, position: idx + 1 })));
@@ -411,6 +425,7 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
             position: s.position,
             vat_rate: s.vat_rate ? parseFloat(s.vat_rate) : null,
             vat_amount: s.vat_amount ? parseFloat(s.vat_amount) : null,
+            net_amount: s.net_amount ? parseFloat(s.net_amount) : null,
           }))
         : [];
 
@@ -634,8 +649,8 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
                 <button onClick={() => {
                     if (!splitVat && vatSplitDrafts.length === 0)
                       setVatSplitDrafts([
-                        { position: 1, vat_rate: draft.vat_percentage, vat_amount: draft.vat_amount },
-                        { position: 2, vat_rate: "", vat_amount: "" },
+                        { position: 1, vat_rate: draft.vat_percentage, vat_amount: draft.vat_amount, net_amount: "" },
+                        { position: 2, vat_rate: "", vat_amount: "", net_amount: "" },
                       ]);
                     setSplitVat((v) => !v);
                   }}
@@ -650,12 +665,12 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
             )}
             {!editing && receiptSplits.map((s, i) => (
               <VatSplitRow key={i} split={s} editing={false}
-                draft={{ position: s.position, vat_rate: "", vat_amount: "" }}
+                draft={{ position: s.position, vat_rate: "", vat_amount: "", net_amount: "" }}
                 onChange={() => {}} onDelete={() => {}} />
             ))}
             {editing && splitVat && (<>
               {vatSplitDrafts.map((s, i) => (
-                <VatSplitRow key={i} split={{ position: s.position, vat_rate: null, vat_amount: null }}
+                <VatSplitRow key={i} split={{ position: s.position, vat_rate: null, vat_amount: null, net_amount: null }}
                   editing={true} draft={s}
                   onChange={(field, value) => setVatSplit(i, field, value)}
                   onDelete={() => deleteVatSplit(i)} />
