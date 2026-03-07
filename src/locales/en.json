@@ -175,7 +175,7 @@
     "switch": "Switch project",
     "default": "default",
     "scanning": "Scanning…",
-    "no_projects": "No projects found in ~/.finanzamt/",
+    "no_projects": "No projects found in ~/.finamt/",
     "receipts": "receipts",
     "badge_default": "default",
     "badge_active": "active",

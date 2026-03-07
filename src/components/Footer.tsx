@@ -16,7 +16,7 @@ export default function Footer() {
 
         {/* PyPI */}
         <a
-          href="https://pypi.org/project/finanzamt/"
+          href="https://pypi.org/project/finamt/"
           target="_blank"
           rel="noreferrer"
           className="flex items-center gap-1 hover:text-red-500 transition-colors"
@@ -27,7 +27,7 @@ export default function Footer() {
 
         {/* GitHub */}
         <a
-          href="https://github.com/yauheniya-ai/finanzamt"
+          href="https://github.com/yauheniya-ai/finamt"
           target="_blank"
           rel="noreferrer"
           className="flex items-center gap-1 hover:text-red-500 transition-colors"
@@ -64,7 +64,7 @@ export default function Footer() {
         <span>
           © {new Date().getFullYear()} —{" "}
           <a
-            href="https://github.com/yauheniya-ai/finanzamt/blob/main/LICENSE"
+            href="https://github.com/yauheniya-ai/finamt/blob/main/LICENSE"
             target="_blank"
             rel="noreferrer"
             className="hover:text-red-500 transition-colors"

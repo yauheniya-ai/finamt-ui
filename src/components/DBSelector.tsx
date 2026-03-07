@@ -163,7 +163,7 @@ export default function DBSelector({ apiBase, activeDb, onSelect }: Props) {
             <div className="px-5 py-4 border-b-2 border-black bg-amber-400 flex items-center justify-between">
               <div>
                 <h2 className="text-sm font-black uppercase tracking-wider">{t("db.title")}</h2>
-                <p className="text-xs text-black/60 font-mono mt-0.5">~/.finanzamt/</p>
+                <p className="text-xs text-black/60 font-mono mt-0.5">~/.finamt/</p>
               </div>
               <button onClick={closeModal}><Icon icon="mdi:close" className="w-5 h-5" /></button>
             </div>

@@ -175,7 +175,7 @@
     "switch": "Projekt wechseln",
     "default": "Standard",
     "scanning": "Suche…",
-    "no_projects": "Keine Projekte in ~/.finanzamt/ gefunden.",
+    "no_projects": "Keine Projekte in ~/.finamt/ gefunden.",
     "receipts": "Belege",
     "badge_default": "Standard",
     "badge_active": "aktiv",
