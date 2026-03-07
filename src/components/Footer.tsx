@@ -11,7 +11,7 @@ export default function Footer() {
                      before:absolute before:inset-0 before:bg-red-500
                      before:-rotate-3 before:z-[-1]"
         >
-          finanzamt
+          finamt
         </span>
 
         {/* PyPI */}

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import DBSelector, { type DBInfo } from "./DBSelector";
 
-const INSTALL_CMD = "pip install finanzamt";
+const INSTALL_CMD = "pip install finamt";
 
 type Props = {
   apiBase:          string;
@@ -36,7 +36,7 @@ export default function Header({ apiBase, activeDb, onDbSelect, onLanguageChange
         <div className="flex items-baseline gap-4">
           <h1 className="relative isolate inline-block text-2xl font-black font-mono text-black
                          before:absolute before:inset-0 before:bg-amber-400 before:-rotate-3 before:z-[-1]">
-            finanzamt
+            finamt
           </h1>
           <span className="text-black/70 text-sm font-medium">
             {t("header.subtitle")}
