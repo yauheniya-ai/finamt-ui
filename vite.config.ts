@@ -7,11 +7,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss(), ],
   server: {
     proxy: {
-      "/receipts":  "http://localhost:8000",
-      "/databases": "http://localhost:8000",
-      "/tax":       "http://localhost:8000",
-      "/health":    "http://localhost:8000",
-      "/config":    "http://localhost:8000",
+      "/api": "http://127.0.0.1:8000",
     },
   },
 })

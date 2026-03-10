@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Icon } from "@iconify/react";
 import type { Receipt, ReceiptItem } from "./Sidebar";
 import { fmt, CATEGORY_META } from "./Sidebar";
@@ -97,8 +97,8 @@ function ItemRow({ item, editing, draft, onChange, onDelete, index }: {
           <span className="text-xs text-black font-black font-mono shrink-0">{fmt(item.total_price)}</span>
         </div>
         <div className="text-xs text-black/40 font-mono mt-0.5 flex gap-2 pl-6">
-          {item.vat_rate   != null && <span>{item.vat_rate}% {t("preview.item_vat_inline")}</span>}
           {item.vat_amount != null && <span>{fmt(item.vat_amount)} {t("preview.item_vat_inline")}</span>}
+          {item.vat_rate   != null && <span>{item.vat_rate}% {t("preview.item_vat_inline")}</span>}
         </div>
       </div>
     );
@@ -187,8 +187,10 @@ type VerifiedCp = {
   address: { street_and_number: string | null; postcode: string | null; city: string | null; state: string | null; country: string | null };
 };
 
-function VerifiedPicker({ apiBase, dbPath, onSelect }: {
-  apiBase: string; dbPath?: string | null; onSelect: (cp: VerifiedCp) => void;
+function VerifiedPicker({ apiBase, dbPath, onSelect, onManage }: {
+  apiBase: string; dbPath?: string | null;
+  onSelect: (cp: VerifiedCp) => void;
+  onManage?: () => void;
 }) {
   const { t } = useTranslation();
   const [list, setList]       = useState<VerifiedCp[]>([]);
@@ -200,7 +202,16 @@ function VerifiedPicker({ apiBase, dbPath, onSelect }: {
     setLoading(true);
     fetch(`${apiBase}/counterparties/verified${qs(dbPath)}`)
       .then((r) => r.json())
-      .then((d) => setList(d.counterparties ?? []))
+      .then((d) => {
+        const raw: VerifiedCp[] = d.counterparties ?? [];
+        const seen = new Set<string>();
+        setList(raw.filter((cp) => {
+          const key = cp.vat_id?.trim() || (cp.name ?? "");
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        }));
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [open]);
@@ -226,8 +237,306 @@ function VerifiedPicker({ apiBase, dbPath, onSelect }: {
               <div className="text-[10px] text-black/40 font-mono">{cp.vat_id ?? cp.tax_number ?? ""}</div>
             </button>
           ))}
+          {onManage && !loading && (
+            <button onClick={() => { setOpen(false); onManage(); }}
+              className="w-full text-left px-3 py-2 text-[10px] font-bold text-black/40 hover:text-black hover:bg-black/5 flex items-center gap-1.5 border-t border-black/10 transition-colors">
+              <Icon icon="mdi:table-account" className="w-3.5 h-3.5" />
+              {t("preview.manage_counterparties")}
+            </button>
+          )}
         </div>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Counterparties Explorer — full-page overlay
+// ---------------------------------------------------------------------------
+type AllCp = VerifiedCp & { created_at?: string | null };
+type CpDraft = {
+  name: string; tax_number: string; vat_id: string; verified: boolean;
+  street_and_number: string; postcode: string; city: string; state: string; country: string;
+};
+
+const cpToDraft = (cp: AllCp): CpDraft => ({
+  name:              cp.name              ?? "",
+  tax_number:        cp.tax_number        ?? "",
+  vat_id:            cp.vat_id            ?? "",
+  verified:          cp.verified,
+  street_and_number: cp.address?.street_and_number ?? "",
+  postcode:          cp.address?.postcode           ?? "",
+  city:              cp.address?.city               ?? "",
+  state:             cp.address?.state              ?? "",
+  country:           cp.address?.country            ?? "",
+});
+
+function CounterpartiesExplorer({ apiBase, dbPath, onClose, onSelect }: {
+  apiBase: string; dbPath?: string | null;
+  onClose: () => void;
+  onSelect?: (cp: VerifiedCp) => void;
+}) {
+  const { t } = useTranslation();
+  const [list,     setList]     = useState<AllCp[]>([]);
+  const [loading,  setLoading]  = useState(true);
+  const [editId,   setEditId]   = useState<string | null>(null);
+  const [editDraft,setEditDraft]= useState<CpDraft | null>(null);
+  const [saving,   setSaving]   = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [error,    setError]    = useState<string | null>(null);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    fetch(`${apiBase}/counterparties${qs(dbPath)}`)
+      .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+      .then((d) => setList(d.counterparties ?? []))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : t("preview.cp_load_error")))
+      .finally(() => setLoading(false));
+  }, [apiBase, dbPath]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const startEdit = (cp: AllCp) => {
+    setEditId(cp.id);
+    setEditDraft(cpToDraft(cp));
+    setDeleteId(null);
+  };
+
+  const handleSave = async (id: string) => {
+    if (!editDraft) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`${apiBase}/counterparties/${id}${qs(dbPath)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name:       editDraft.name       || null,
+          tax_number: editDraft.tax_number || null,
+          vat_id:     editDraft.vat_id     || null,
+          verified:   editDraft.verified,
+          address: {
+            street_and_number: editDraft.street_and_number || null,
+            postcode:          editDraft.postcode           || null,
+            city:              editDraft.city               || null,
+            state:             editDraft.state              || null,
+            country:           editDraft.country            || null,
+          },
+        }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setList((prev) => prev.map((cp) => cp.id !== id ? cp : {
+        ...cp,
+        name:       editDraft.name       || null,
+        tax_number: editDraft.tax_number || null,
+        vat_id:     editDraft.vat_id     || null,
+        verified:   editDraft.verified,
+        address: {
+          street_and_number: editDraft.street_and_number || null,
+          postcode:          editDraft.postcode           || null,
+          city:              editDraft.city               || null,
+          state:             editDraft.state              || null,
+          country:           editDraft.country            || null,
+        },
+      }));
+      setEditId(null);
+      setEditDraft(null);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Save failed.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    setDeleting(true);
+    try {
+      const res = await fetch(`${apiBase}/counterparties/${id}${qs(dbPath)}`, { method: "DELETE" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setList((prev) => prev.filter((cp) => cp.id !== id));
+      setDeleteId(null);
+      setEditId(null);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Delete failed.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const inp = (label: string, field: keyof CpDraft) => (
+    <label className="flex flex-col gap-0.5">
+      <span className="text-[9px] font-black uppercase tracking-wider text-black/40">{label}</span>
+      <input
+        value={(editDraft?.[field] as string) ?? ""}
+        onChange={(e) => setEditDraft((d) => d ? { ...d, [field]: e.target.value } : d)}
+        className="w-full text-xs font-mono text-black bg-white border border-amber-300 rounded px-2 py-1 outline-none focus:border-amber-500"
+      />
+    </label>
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 flex items-stretch justify-end">
+      <div className="w-full max-w-3xl bg-white flex flex-col shadow-2xl">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3 border-b-2 border-black shrink-0">
+          <h2 className="text-sm font-black uppercase tracking-wider">{t("preview.cp_explorer_title")}</h2>
+          <button onClick={onClose} className="text-black/40 hover:text-black transition-colors p-0.5 rounded">
+            <Icon icon="mdi:close" className="w-5 h-5" />
+          </button>
+        </div>
+
+        {error && (
+          <div className="mx-4 mt-3 px-3 py-2 bg-red-50 border border-red-200 rounded text-xs text-red-600 font-mono flex items-center justify-between gap-3">
+            <span>{error}</span>
+            <button onClick={() => { setError(null); load(); }}
+              className="text-[10px] font-black text-red-500 hover:text-red-700 border border-red-300 hover:border-red-500 px-2 py-0.5 rounded transition-colors whitespace-nowrap">
+              {t("preview.retry")}
+            </button>
+          </div>
+        )}
+
+        {/* List */}
+        <div className="flex-1 overflow-y-auto min-h-0">
+          {loading ? (
+            <div className="p-6 text-xs text-black/30 font-mono text-center">{t("preview.loading")}</div>
+          ) : error && list.length === 0 ? null : list.length === 0 ? (
+            <div className="p-6 text-xs text-black/30 font-mono text-center">{t("preview.cp_no_records")}</div>
+          ) : (
+            <div className="divide-y divide-black/10">
+              {list.map((cp) => {
+                const isEditing = editId === cp.id;
+                return (
+                  <div key={cp.id} className={isEditing ? "bg-amber-50/60" : "hover:bg-black/[.02]"}>
+                    {/* Summary row */}
+                    <div className="px-4 py-3 flex items-start gap-3">
+                      {/* Main info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-black text-black">{cp.name ?? "—"}</span>
+                          {cp.verified && (
+                            <span className="bg-amber-400 text-black text-[9px] font-black px-1.5 py-0.5 rounded uppercase leading-none">{t("preview.verified")}</span>
+                          )}
+                        </div>
+                        <div className="flex gap-3 mt-0.5 flex-wrap">
+                          {cp.vat_id    && <span className="text-[10px] text-black/50 font-mono">{cp.vat_id}</span>}
+                          {cp.tax_number && <span className="text-[10px] text-black/40 font-mono">{cp.tax_number}</span>}
+                        </div>
+                        <div className="flex gap-3 mt-0.5 flex-wrap">
+                          {cp.address?.street_and_number && <span className="text-[10px] text-black/40">{cp.address.street_and_number}</span>}
+                          {(cp.address?.postcode || cp.address?.city) && (
+                            <span className="text-[10px] text-black/40">{[cp.address.postcode, cp.address.city].filter(Boolean).join(" ")}</span>
+                          )}
+                          {cp.address?.state   && <span className="text-[10px] text-black/40">{cp.address.state}</span>}
+                          {cp.address?.country && <span className="text-[10px] text-black/40">{cp.address.country}</span>}
+                        </div>
+                        <div className="mt-1 flex gap-3">
+                          <span className="text-[9px] text-black/20 font-mono" title={cp.id}>{cp.id.slice(0, 8)}</span>
+                          {cp.created_at && <span className="text-[9px] text-black/20 font-mono">{cp.created_at.slice(0, 10)}</span>}
+                        </div>
+                      </div>
+                      {/* Actions */}
+                      <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
+                        {onSelect && (
+                          <button onClick={() => { onSelect(cp); onClose(); }}
+                            className="text-[10px] font-bold text-black/50 hover:text-black border border-black/20 hover:border-black px-2 py-0.5 rounded transition-colors whitespace-nowrap">
+                            {t("preview.select_cp")}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => isEditing ? (setEditId(null), setEditDraft(null)) : startEdit(cp)}
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded border transition-colors whitespace-nowrap ${
+                            isEditing
+                              ? "text-black/50 border-black/20 hover:border-black hover:text-black"
+                              : "text-amber-700 bg-amber-50 border-amber-300 hover:bg-amber-100"
+                          }`}>
+                          {isEditing ? t("preview.btn_cancel") : t("preview.cp_edit")}
+                        </button>
+                        <button onClick={() => { setDeleteId(deleteId === cp.id ? null : cp.id); setEditId(null); setEditDraft(null); }}
+                          className="text-black/30 hover:text-red-500 transition-colors shrink-0 p-0.5">
+                          <Icon icon="mdi:trash-can-outline" className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Inline edit form */}
+                    {isEditing && editDraft && (
+                      <div className="px-4 pb-4 pt-1 border-t border-amber-200 bg-amber-50/80">
+                        <p className="text-[10px] font-black uppercase tracking-wider text-black/40 mb-3">{t("preview.cp_edit_title")}</p>
+                        <div className="grid grid-cols-2 gap-3 mb-3">
+                          {inp(t("preview.cp_field_name"),       "name")}
+                          {inp(t("preview.cp_field_tax_number"), "tax_number")}
+                          {inp(t("preview.cp_field_vat_id"),     "vat_id")}
+                          <label className="flex flex-col gap-0.5">
+                            <span className="text-[9px] font-black uppercase tracking-wider text-black/40">{t("preview.cp_field_verified")}</span>
+                            <label className="flex items-center gap-2 h-7 cursor-pointer">
+                              <span className={`w-3.5 h-3.5 rounded-sm border flex items-center justify-center transition-colors ${
+                                editDraft.verified ? "bg-amber-400 border-amber-500" : "bg-white border-black/30"
+                              }`}>
+                                {editDraft.verified && <Icon icon="mdi:check" className="w-2.5 h-2.5 text-black" />}
+                              </span>
+                              <input type="checkbox" className="sr-only" checked={editDraft.verified}
+                                onChange={(e) => setEditDraft((d) => d ? { ...d, verified: e.target.checked } : d)} />
+                              <span className="text-xs text-black/60">{editDraft.verified ? t("preview.yes") : t("preview.no")}</span>
+                            </label>
+                          </label>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 mb-4">
+                          {inp(t("preview.cp_field_street"),   "street_and_number")}
+                          {inp(t("preview.cp_field_postcode"), "postcode")}
+                          {inp(t("preview.cp_field_city"),     "city")}
+                          {inp(t("preview.cp_field_state"),    "state")}
+                          {inp(t("preview.cp_field_country"),  "country")}
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => handleSave(cp.id)} disabled={saving}
+                            className="text-[11px] font-black bg-black text-white px-3 py-1.5 rounded hover:bg-black/80 disabled:opacity-40 transition-colors flex items-center gap-1.5">
+                            {saving && <Icon icon="svg-spinners:12-dots-scale-rotate" className="w-3 h-3" />}
+                            {t("preview.cp_save")}
+                          </button>
+                          <button onClick={() => { setEditId(null); setEditDraft(null); }}
+                            className="text-[11px] font-black bg-white text-black border border-black/20 px-3 py-1.5 rounded hover:bg-black/5 transition-colors">
+                            {t("preview.btn_cancel")}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Delete confirm */}
+                    {deleteId === cp.id && !isEditing && (
+                      <div className="px-4 py-2 border-t border-red-200 bg-red-50 flex items-center justify-between gap-3">
+                        <span className="text-xs text-red-600 font-bold">{t("preview.cp_delete_confirm")}</span>
+                        <div className="flex gap-2">
+                          <button onClick={() => handleDelete(cp.id)} disabled={deleting}
+                            className="text-[11px] font-black bg-red-500 text-white px-2.5 py-1 rounded hover:bg-red-600 disabled:opacity-40 transition-colors">
+                            {t("preview.yes")}
+                          </button>
+                          <button onClick={() => setDeleteId(null)} disabled={deleting}
+                            className="text-[11px] font-black bg-white text-red-500 border border-red-400 px-2.5 py-1 rounded hover:bg-red-50 transition-colors">
+                            {t("preview.no")}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-3 border-t border-black/10 shrink-0 flex items-center justify-between">
+          <span className="text-[10px] text-black/30 font-mono">
+            {list.length} {list.length === 1 ? "entry" : "entries"}
+          </span>
+          <button onClick={onClose}
+            className="text-xs font-bold bg-black text-white px-4 py-1.5 rounded hover:bg-black/80 transition-colors">
+            {t("preview.btn_cancel")}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -263,6 +572,7 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
   const [savedVisible,     setSavedVisible]     = useState(false);
   const [saveErr,          setSaveErr]          = useState<string | null>(null);
   const [pdfOpen,          setPdfOpen]          = useState(false);
+  const [cpExplorerOpen,   setCpExplorerOpen]   = useState(false);
   const [addrOpen,         setAddrOpen]         = useState(false);
   const [confirmDeleteIdx, setConfirmDeleteIdx] = useState<number | null>(null);
   const [splitVat,         setSplitVat]         = useState(false);
@@ -567,7 +877,7 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
             {verifiedWidget}
           </div>
           <div className="border-2 border-black rounded px-3 py-1">
-            {editing && <VerifiedPicker apiBase={apiBase} dbPath={dbPath} onSelect={applyVerifiedCp} />}
+            {editing && <VerifiedPicker apiBase={apiBase} dbPath={dbPath} onSelect={applyVerifiedCp} onManage={() => setCpExplorerOpen(true)} />}
             <FieldRow label={t("preview.field_name")} value={counterpartyName}
               editing={editing} inputValue={draft.counterparty_name}
               onInput={(v) => setDraft((d) => ({ ...d, counterparty_name: v }))} />
@@ -764,34 +1074,50 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
   );
 
   // ── Fullscreen layout: PDF left + same panel right ────────────────────────
+  const explorer = cpExplorerOpen && (
+    <CounterpartiesExplorer
+      apiBase={apiBase} dbPath={dbPath}
+      onClose={() => setCpExplorerOpen(false)}
+      onSelect={(cp) => { applyVerifiedCp(cp); setCpExplorerOpen(false); }}
+    />
+  );
+
   if (pdfOpen && pdfUrl) {
     return (
-      <div className="fixed inset-0 z-50 flex bg-black">
-        {/* PDF side */}
-        <div className="flex-1 min-w-0 flex flex-col">
-          <div className="px-3 py-2 bg-black border-b border-white/10 shrink-0 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Tip label={t("preview.tip_exit_fullscreen")} pos="bottom-right">
-                <button onClick={() => setPdfOpen(false)} className="text-white/50 hover:text-white transition-colors p-0.5 rounded">
-                  <Icon icon="mdi:arrow-left" className="w-4 h-4" />
-                </button>
-              </Tip>
-            </div>
-          </div>
-          {isPdf(pdfUrl)
-            ? <iframe src={pdfUrl} className="flex-1" title="Receipt PDF fullscreen" />
-            : (
-              <div className="flex-1 min-h-0 flex items-center justify-center bg-black overflow-hidden">
-                <img src={pdfUrl} className="max-h-full max-w-full object-contain" alt="Receipt fullscreen" />
+      <>
+        <div className="fixed inset-0 z-50 flex bg-black">
+          {/* PDF side */}
+          <div className="flex-1 min-w-0 flex flex-col">
+            <div className="px-3 py-2 bg-black border-b border-white/10 shrink-0 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Tip label={t("preview.tip_exit_fullscreen")} pos="bottom-right">
+                  <button onClick={() => setPdfOpen(false)} className="text-white/50 hover:text-white transition-colors p-0.5 rounded">
+                    <Icon icon="mdi:arrow-left" className="w-4 h-4" />
+                  </button>
+                </Tip>
               </div>
-            )
-          }
+            </div>
+            {isPdf(pdfUrl)
+              ? <iframe src={pdfUrl} className="flex-1" title="Receipt PDF fullscreen" />
+              : (
+                <div className="flex-1 min-h-0 flex items-center justify-center bg-black overflow-hidden">
+                  <img src={pdfUrl} className="max-h-full max-w-full object-contain" alt="Receipt fullscreen" />
+                </div>
+              )
+            }
+          </div>
+          {/* Data panel — same as normal, full editing available */}
+          {panelContent(true)}
         </div>
-        {/* Data panel — same as normal, full editing available */}
-        {panelContent(true)}
-      </div>
+        {explorer}
+      </>
     );
   }
 
-  return panelContent(false);
+  return (
+    <>
+      {panelContent(false)}
+      {explorer}
+    </>
+  );
 }
