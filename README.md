@@ -1,73 +1,30 @@
-# React + TypeScript + Vite
+# finamt
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+<img src="https://raw.githubusercontent.com/yauheniya-ai/finamt/main/.github/images/finamt-wordmark.svg" width="50%" alt="finamt"/>
 
-Currently, two official plugins are available:
+<div>
+<br>
+</div>
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+<div align="center">
 
-## React Compiler
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-red.svg)](https://opensource.org/licenses/MIT)
+[![PyPI version](https://img.shields.io/pypi/v/finamt?color=blue&label=PyPI)](https://pypi.org/project/finamt/)
+[![Tests](https://github.com/yauheniya-ai/finamt/actions/workflows/tests.yml/badge.svg)](https://github.com/yauheniya-ai/finamt/actions/workflows/tests.yml)
+[![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/yauheniya-ai/d09f6edc7b1928aeea1fbde834a6080b/raw/coverage.json)](https://github.com/yauheniya-ai/finamt/actions/workflows/tests.yml)
+[![GitHub last commit](https://img.shields.io/github/last-commit/yauheniya-ai/finamt)](https://github.com/yauheniya-ai/finamt/commits/main)
+[![Documentation Status](https://readthedocs.org/projects/finamt/badge/?version=latest)](https://readthedocs.org/projects/finamt/)
+[![Downloads](https://pepy.tech/badge/finamt)](https://pepy.tech/project/finamt)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+</div>
 
-## Expanding the ESLint configuration
+<div>
+<br>
+</div>
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
-
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+> **finamt-ui** is a React-based frontend for the [finamt](https://github.com/yauheniya-ai/finamt) project, built as static assets for integration with the [finamt PyPI package UI](https://pypi.org/project/finamt/).
+>
+> <img src="https://api.iconify.design/skill-icons:github-dark.svg" width="16" height="16"> [Main backend repo](https://github.com/yauheniya-ai/finamt)
+>
+> <img src="https://api.iconify.design/devicon:pypi.svg" width="16" height="16"> [PyPI package](https://pypi.org/project/finamt/)
