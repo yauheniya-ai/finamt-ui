@@ -993,7 +993,7 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
             </>)}
             {(!editing || !splitVat) && receiptSplits.length === 0 && (<>
               <FieldRow label={t("preview.field_vat_pct")}
-                value={receipt.vat_percentage != null ? `${receipt.vat_percentage}%` : null}
+                value={receipt.vat_percentage != null ? `${receipt.vat_percentage} %` : null}
                 editing={editing} inputValue={draft.vat_percentage}
                 onInput={(v) => setDraft((d) => ({ ...d, vat_percentage: v }))} />
               <FieldRow label={t("preview.field_vat_amt")} value={fmt(receipt.vat_amount)}
