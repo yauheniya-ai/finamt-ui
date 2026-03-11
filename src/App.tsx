@@ -63,8 +63,13 @@ export default function App() {
           if (eventType === "progress") {
             const msg: string = JSON.parse(data);
             // Only surface the steps the user cares about
-            const m = msg.match(/→\s+(PyMuPDF|PaddleOCR|Tesseract|Agent\s+[1-4])/);
-            if (m) setProgressStep(m[1].replace(/\s+/, " ") + "...");
+            const m = msg.match(/→\s+(PyMuPDF|PaddleOCR|Tesseract|Agent\s+([1-4]))/);
+            if (m) {
+              const label = m[2]
+                ? `Agent ${m[2]}/4`
+                : m[1].replace(/\s+/, " ");
+              setProgressStep(label + "...");
+            }
           } else if (eventType === "result") {
             receipt = JSON.parse(data) as Receipt;
             break outer;
