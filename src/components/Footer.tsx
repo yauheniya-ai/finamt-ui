@@ -49,7 +49,7 @@ export default function Footer() {
 
         {/* RTD */}
         <a
-          href="https://docs.readthedocs.com"
+          href="https://finamt.readthedocs.io"
           target="_blank"
           rel="noreferrer"
           className="flex items-center gap-1 hover:text-red-500 transition-colors"
