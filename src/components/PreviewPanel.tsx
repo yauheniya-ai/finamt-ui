@@ -60,15 +60,50 @@ function FieldRow({ label, value, editing, inputValue, onInput, placeholder }: {
 // ---------------------------------------------------------------------------
 function CategorySelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const meta = CATEGORY_META[value] as CategoryMeta | undefined;
+
   return (
     <div className="flex items-start justify-between gap-3 py-2 border-b border-black/10">
-      <span className="text-xs text-black/50 font-bold uppercase tracking-wider shrink-0 w-28 pt-0.5">{t("preview.field_category")}</span>
-      <select value={value} onChange={(e) => onChange(e.target.value)}
-        className="flex-1 min-w-0 text-xs text-black font-mono bg-amber-50 border border-amber-300 rounded px-2 py-1 outline-none focus:border-amber-500">
-        {(Object.entries(CATEGORY_META) as [string, CategoryMeta][]).map(([k, v]) => (
-          <option key={k} value={k}>{t(`sidebar.categories.${k}`, { defaultValue: v.label })}</option>
-        ))}
-      </select>
+      <span className="text-xs text-black/50 font-bold uppercase tracking-wider shrink-0 w-28 pt-0.5">
+        {t("preview.field_category")}
+      </span>
+
+      <div className="relative flex-1 min-w-0">
+        {/* Trigger */}
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="w-full flex items-center gap-1.5 text-xs text-black font-mono bg-amber-50 border border-amber-300 rounded px-2 py-1 outline-none focus:border-amber-500 cursor-pointer"
+        >
+          {meta && <Icon icon={meta.icon} className="shrink-0 text-base" />}
+          <span className="flex-1 text-left truncate">
+            {t(`sidebar.categories.${value}`, { defaultValue: meta?.label ?? value })}
+          </span>
+          <Icon icon="mdi:chevron-down" className={`shrink-0 text-base transition-transform ${open ? "rotate-180" : ""}`} />
+        </button>
+
+        {/* Dropdown */}
+        {open && (
+          <ul
+            className="absolute z-30 mt-1 w-full bg-white border border-amber-300 rounded shadow-lg max-h-56 overflow-y-auto"
+            onMouseLeave={() => setOpen(false)}
+          >
+            {(Object.entries(CATEGORY_META) as [string, CategoryMeta][]).map(([k, v]) => (
+              <li key={k}>
+                <button
+                  type="button"
+                  onClick={() => { onChange(k); setOpen(false); }}
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 text-xs font-mono text-left hover:bg-amber-50 transition-colors ${k === value ? "bg-amber-100 font-bold" : ""}`}
+                >
+                  <Icon icon={v.icon} className="shrink-0 text-base" />
+                  <span>{t(`sidebar.categories.${k}`, { defaultValue: v.label })}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }

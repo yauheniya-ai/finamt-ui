@@ -342,7 +342,17 @@ export default function Sidebar({
   const expenseCats  = Object.entries(CATEGORY_META).filter(([cat]) => !REVENUE_CATS.has(cat));
 
   const renderGroup = (cat: string, meta: { label: string; icon: string }, type: "purchase" | "sale") => {
-    const items = (grouped[cat] ?? []).filter((r) => r.receipt_type === type);
+    const items = (grouped[cat] ?? [])
+      .filter((r) => r.receipt_type === type)
+      .sort((a, b) => {
+        const nameA = displayName(a).toLowerCase();
+        const nameB = displayName(b).toLowerCase();
+        if (nameA !== nameB) return nameA < nameB ? -1 : 1;
+        // Same name → latest date first
+        const dA = a.receipt_date ?? "";
+        const dB = b.receipt_date ?? "";
+        return dB.localeCompare(dA);
+      });
     if (!items.length) return null;
     return (
       <CategoryGroup
