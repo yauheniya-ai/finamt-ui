@@ -1,7 +1,8 @@
+import { useState } from "react";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import type { Receipt, PeriodFilter } from "./Sidebar";
-import { CATEGORY_META, fmt } from "./Sidebar";
+import { CATEGORY_META, fmt, displayName } from "./Sidebar";
 import type { CategoryMeta } from "./Sidebar";
 
 type Props = { receipts: Receipt[]; period: PeriodFilter };
@@ -28,36 +29,92 @@ function StatCard({ label, value, sub, variant = "white" }: {
 }
 
 // ---------------------------------------------------------------------------
-// Category bar chart
+// Category bar chart (with per-supplier drill-down)
 // ---------------------------------------------------------------------------
-function CategoryChart({ title, totals }: { title: string; totals: Record<string, number> }) {
+function CategoryChart({ title, totals, receipts }: {
+  title: string;
+  totals: Record<string, number>;
+  receipts: Receipt[];
+}) {
   const { t } = useTranslation();
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const max    = Math.max(...Object.values(totals), 1);
   const sorted = Object.entries(totals).sort(([, a], [, b]) => b - a);
+
+  const toggle = (cat: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      next.has(cat) ? next.delete(cat) : next.add(cat);
+      return next;
+    });
+
   return (
     <div className="bg-white border-2 border-amber-400 rounded p-4">
       <h3 className="text-black text-sm font-black uppercase tracking-wider mb-4">{title}</h3>
       {sorted.length === 0 ? (
         <p className="text-black/70 text-sm text-center py-8 font-mono">{t("dashboard.no_data")}</p>
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-1">
           {sorted.map(([cat, total]) => {
             const pct  = Math.round((total / max) * 100);
             const meta = CATEGORY_META[cat] as CategoryMeta | undefined;
+            const isOpen = expanded.has(cat);
+
+            // aggregate by supplier within this category
+            const supplierTotals = receipts
+              .filter((r) => (r.category in CATEGORY_META ? r.category : "other") === cat)
+              .reduce<Record<string, number>>((acc, r) => {
+                const name = displayName(r);
+                acc[name] = (acc[name] ?? 0) + (r.total_amount ?? 0);
+                return acc;
+              }, {});
+            const supplierEntries = Object.entries(supplierTotals).sort(([, a], [, b]) => b - a);
+            const hasMultiple = supplierEntries.length > 1;
+
             return (
-              <div key={cat} className="flex items-center gap-3">
-                <span className="text-xs text-black/70 font-bold w-36 capitalize shrink-0 flex items-center gap-1.5 truncate">
-                  {meta?.icon && <Icon icon={meta.icon} className="w-3.5 h-3.5 shrink-0" />}
-                  <span className="truncate">
-                    {t(`sidebar.categories.${cat}`, { defaultValue: meta?.label ?? cat })}
+              <div key={cat}>
+                {/* Category row */}
+                <div
+                  className={`flex items-center gap-3 py-2 rounded ${
+                    hasMultiple ? "cursor-pointer hover:bg-amber-50" : ""
+                  }`}
+                  onClick={() => hasMultiple && toggle(cat)}
+                >
+                  <span className="text-xs text-black/70 font-bold w-36 capitalize shrink-0 flex items-center gap-1.5 truncate">
+                    {meta?.icon && <Icon icon={meta.icon} className="w-3.5 h-3.5 shrink-0" />}
+                    <span className="truncate">
+                      {t(`sidebar.categories.${cat}`, { defaultValue: meta?.label ?? cat })}
+                    </span>
                   </span>
-                </span>
-                <div className="flex-1 bg-amber-100 border border-amber-200 rounded h-3 overflow-hidden">
-                  <div className="bg-black h-3 rounded transition-all" style={{ width: `${pct}%` }} />
+                  <div className="flex-1 bg-amber-100 border border-amber-200 rounded h-3 overflow-hidden">
+                    <div className="bg-black h-3 rounded transition-all" style={{ width: `${pct}%` }} />
+                  </div>
+                  <span className="text-xs text-black font-black font-mono w-24 text-right shrink-0">
+                    {fmt(total)}
+                  </span>
+                  {hasMultiple ? (
+                    <Icon
+                      icon="mdi:chevron-down"
+                      className={`w-3.5 h-3.5 text-black/30 shrink-0 transition-transform ${
+                        isOpen ? "rotate-180" : ""
+                      }`}
+                    />
+                  ) : (
+                    <span className="w-3.5 shrink-0" />
+                  )}
                 </div>
-                <span className="text-xs text-black font-black font-mono w-24 text-right shrink-0">
-                  {fmt(total)}
-                </span>
+
+                {/* Supplier breakdown */}
+                {isOpen && (
+                  <div className="ml-[9.5rem] mb-2 flex flex-col gap-1 border-l-2 border-amber-200 pl-3">
+                    {supplierEntries.map(([name, amt]) => (
+                      <div key={name} className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] text-black/60 font-mono truncate">{name}</span>
+                        <span className="text-[11px] text-black font-mono font-bold shrink-0">{fmt(amt)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -176,10 +233,10 @@ export default function Dashboard({ receipts, period }: Props) {
           ? "grid-cols-2" : "grid-cols-1"
       }`}>
         {Object.keys(revenueTotals).length > 0 && (
-          <CategoryChart title={t("dashboard.chart_revenue")} totals={revenueTotals} />
+          <CategoryChart title={t("dashboard.chart_revenue")} totals={revenueTotals} receipts={sales} />
         )}
         {Object.keys(expenseTotals).length > 0 && (
-          <CategoryChart title={t("dashboard.chart_expenses")} totals={expenseTotals} />
+          <CategoryChart title={t("dashboard.chart_expenses")} totals={expenseTotals} receipts={purchases} />
         )}
         {receipts.length === 0 && (
           <div className="bg-white border-2 border-amber-400 rounded p-8 text-center col-span-2">
