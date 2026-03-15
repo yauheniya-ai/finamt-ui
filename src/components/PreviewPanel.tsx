@@ -109,30 +109,112 @@ function CategorySelect({ value, onChange }: { value: string; onChange: (v: stri
 }
 
 // ---------------------------------------------------------------------------
-// ItemRow
+// Currency symbol helper: $ USD, £ GBP, € EUR, otherwise 3-letter code
+// ---------------------------------------------------------------------------
+function currSymbol(currency: string): string {
+  const sym = (() => {
+    try {
+      const parts = new Intl.NumberFormat("en", { style: "currency", currency, currencyDisplay: "narrowSymbol" })
+        .formatToParts(0);
+      return parts.find((p) => p.type === "currency")?.value ?? currency;
+    } catch { return currency; }
+  })();
+  // Keep only if it's actually a symbol (not same as code); fallback to code
+  return sym === currency || sym.length > 3 ? currency : sym;
+}
+
+// ---------------------------------------------------------------------------
+// CurrencyConverter — fetches live rate from Frankfurter, reports it upward
+// ---------------------------------------------------------------------------
+function CurrencyConverter({
+  currency,
+  onRateChange,
+}: {
+  currency: string;
+  onRateChange: (rate: number | null) => void;
+}) {
+  const { t } = useTranslation();
+  const [rate,       setRate]       = useState<number | null>(null);
+  const [rateDate,   setRateDate]   = useState<string | null>(null);
+  const [customRate, setCustomRate] = useState("");
+  const [loading,    setLoading]    = useState(false);
+  const [error,      setError]      = useState<string | null>(null);
+
+  // Fetch live rate whenever the currency changes
+  useEffect(() => {
+    setRate(null); setRateDate(null); setCustomRate(""); setError(null);
+    onRateChange(null);
+    if (!currency || currency === "EUR") return;
+    setLoading(true);
+    fetch(`https://api.frankfurter.app/latest?from=${currency}&to=EUR`)
+      .then((r) => r.json())
+      .then((d) => { setRate(d.rates?.EUR ?? null); setRateDate(d.date ?? null); })
+      .catch(() => setError("Rate unavailable"))
+      .finally(() => setLoading(false));
+  }, [currency]);
+
+  // Report effective rate (custom overrides fetched) back to parent
+  const effectiveRate = customRate ? parseFloat(customRate) : rate;
+  useEffect(() => { onRateChange(effectiveRate ?? null); }, [effectiveRate]);
+
+  if (currency === "EUR") return null;
+
+  return (
+    <div className="mt-1 mb-1 rounded border border-amber-300 bg-amber-50/60 px-3 py-2 text-xs">
+      <div className="flex items-center gap-1.5 font-bold text-black/60 mb-1.5">
+        <Icon icon="mdi:swap-horizontal" className="w-3.5 h-3.5" />
+        <span>{currency} → EUR</span>
+        {loading && <Icon icon="svg-spinners:3-dots-fade" className="w-4 h-4 ml-1" />}
+        {rateDate && !customRate && (
+          <span className="ml-auto font-mono text-[10px] text-black/40">
+            {t("preview.rate_as_of", { date: rateDate, defaultValue: `as of ${rateDate}` })}
+          </span>
+        )}
+      </div>
+      {error && <p className="text-red-500 text-[10px] mb-1">{error}</p>}
+      <div className="flex items-center gap-2">
+        <span className="text-black/50 text-[10px] shrink-0">
+          {t("preview.rate_label", { defaultValue: "Rate" })}
+        </span>
+        <input
+          type="number" step="0.00001" min="0"
+          value={customRate}
+          onChange={(e) => setCustomRate(e.target.value)}
+          placeholder={rate != null ? rate.toFixed(5) : ""}
+          className="w-28 text-xs font-mono bg-white border border-amber-300 rounded px-2 py-0.5 outline-none focus:border-amber-500"
+        />
+        {effectiveRate != null && (
+          <span className="ml-auto text-[10px] text-black/40 font-mono">× {effectiveRate.toFixed(5)}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 type DraftItem = {
   position: number; description: string;
   vat_rate: string; vat_amount: string; total_price: string; category: string;
 };
 
-function ItemRow({ item, editing, draft, onChange, onDelete, index }: {
+function ItemRow({ item, editing, draft, onChange, onDelete, index, currency = "EUR" }: {
   item: ReceiptItem; editing: boolean; draft: DraftItem;
   onChange: (field: keyof DraftItem, value: string) => void;
-  onDelete: () => void; index: number;
+  onDelete: () => void; index: number; currency?: string;
 }) {
   const { t } = useTranslation();
   const pos = item.position ?? index + 1;
+  const sym = currSymbol(currency);
   if (!editing) {
     return (
       <div className="px-3 py-2">
         <div className="flex justify-between items-start gap-2">
           <span className="text-[10px] font-black text-black/30 font-mono shrink-0 w-4">{pos}.</span>
           <span className="text-xs text-black font-semibold flex-1 min-w-0">{item.description || "—"}</span>
-          <span className="text-xs text-black font-black font-mono shrink-0">{fmt(item.total_price)}</span>
+          <span className="text-xs text-black font-black font-mono shrink-0">{fmt(item.total_price, currency)}</span>
         </div>
         <div className="text-xs text-black/40 font-mono mt-0.5 flex gap-2 pl-6">
-          {item.vat_amount != null && <span>{fmt(item.vat_amount)} {t("preview.item_vat_inline")}</span>}
+          {item.vat_amount != null && <span>{fmt(item.vat_amount, currency)} {t("preview.item_vat_inline")}</span>}
           {item.vat_rate   != null && <span>{item.vat_rate}% {t("preview.item_vat_inline")}</span>}
         </div>
       </div>
@@ -150,13 +232,20 @@ function ItemRow({ item, editing, draft, onChange, onDelete, index }: {
         </button>
       </div>
       <div className="grid grid-cols-3 gap-1 pl-6">
-        {([["vat_rate", t("preview.item_label_vat_pct")],["vat_amount", t("preview.item_label_vat_amt")],["total_price", t("preview.item_label_total")]] as [keyof DraftItem, string][]).map(([field, label]) => (
-          <div key={field} className="flex flex-col gap-0.5">
-            <span className="text-[9px] font-bold uppercase text-black/40">{label}</span>
-            <input value={draft[field] as string} onChange={(e) => onChange(field, e.target.value)}
-              className="w-full text-xs font-mono text-black bg-white border border-amber-300 rounded px-1.5 py-0.5 outline-none focus:border-amber-500" />
-          </div>
-        ))}
+        {(["vat_rate", "vat_amount", "total_price"] as (keyof DraftItem)[]).map((field) => {
+          const label = field === "vat_rate"
+            ? t("preview.item_label_vat_pct")
+            : field === "vat_amount"
+              ? t("preview.item_label_vat_amt", { sym })
+              : t("preview.item_label_total", { sym });
+          return (
+            <div key={field} className="flex flex-col gap-0.5">
+              <span className="text-[9px] font-bold uppercase text-black/40">{label}</span>
+              <input value={draft[field] as string} onChange={(e) => onChange(field, e.target.value)}
+                className="w-full text-xs font-mono text-black bg-white border border-amber-300 rounded px-1.5 py-0.5 outline-none focus:border-amber-500" />
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -615,12 +704,13 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
   const [itemDrafts,       setItemDrafts]       = useState<DraftItem[]>([]);
   const [verifyConfirm,    setVerifyConfirm]    = useState(false);
   const [localVerified,    setLocalVerified]    = useState<boolean | null>(null);
+  const [convRate,         setConvRate]         = useState<number | null>(null);
   const [draft, setDraft] = useState<Record<string, string>>({
     counterparty_name: "", vat_id: "", tax_number: "",
     address_street_and_number: "", address_postcode: "",
     address_city: "", address_state: "", address_country: "",
     receipt_number: "", receipt_date: "", receipt_type: "purchase",
-    total_amount: "", vat_percentage: "", vat_amount: "", category: "",
+    total_amount: "", vat_percentage: "", vat_amount: "", category: "", currency: "",
   });
 
   // Reset local overrides whenever we switch to a different receipt
@@ -630,6 +720,7 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
     setEditing(false);
     setSavedVisible(false);
     setSaveErr(null);
+    setConvRate(null);
   }, [receipt?.id]);
 
   if (!receipt) return <EmptyState />;
@@ -640,6 +731,13 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
   const cpVerifiedFromReceipt = !!(receipt.counterparty as (typeof receipt.counterparty & { verified?: boolean }))?.verified;
   const isVerified = localVerified !== null ? localVerified : cpVerifiedFromReceipt;
   const cpId = receipt.counterparty?.id ?? null;
+  // Receipt currency (default EUR)
+  const rcCurrency = receipt.currency ?? "EUR";
+  // Helper: if non-EUR and rate available, display EUR equivalent; otherwise original currency
+  const cvt = (n: number | null | undefined) =>
+    rcCurrency !== "EUR" && convRate != null && n != null
+      ? fmt(n * convRate)
+      : fmt(n, rcCurrency);
 
   // ── Edit helpers ──────────────────────────────────────────────────────────
 
@@ -661,6 +759,7 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
       vat_percentage:        receipt.vat_percentage?.toString() ?? "",
       vat_amount:            receipt.vat_amount?.toString()     ?? "",
       category:              receipt.category ?? "",
+      currency:              receipt.currency ?? "EUR",
     });
     setItemDrafts(
       (receipt.items ?? []).map((item, i) => ({
@@ -749,6 +848,7 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
       for (const [k, v] of [
         ["total_amount", draft.total_amount], ["vat_percentage", draft.vat_percentage], ["vat_amount", draft.vat_amount],
       ] as [string, string][]) { if (v) payload[k] = parseFloat(v); }
+      if (draft.currency) payload.currency = draft.currency.toUpperCase();
       if (draft.vat_id)     payload.vat_id     = draft.vat_id;
       if (draft.tax_number) payload.tax_number = draft.tax_number;
       if (localVerified !== null) payload.counterparty_verified = localVerified;
@@ -985,9 +1085,31 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
         <section>
           <h3 className="text-black text-xs font-black uppercase tracking-wider mb-2">{t("preview.section_amounts")}</h3>
           <div className="border-2 border-amber-400 rounded px-3 py-1 bg-amber-50">
-            <FieldRow label={t("preview.field_total")} value={fmt(receipt.total_amount)}
+            <FieldRow label={t("preview.field_total")} value={cvt(receipt.total_amount)}
               editing={editing} inputValue={draft.total_amount}
               onInput={(v) => setDraft((d) => ({ ...d, total_amount: v }))} />
+            {/* Currency row */}
+            <div className="flex items-start justify-between gap-3 py-2 border-b border-black/10">
+              <span className="text-xs text-black/50 font-bold uppercase tracking-wider shrink-0 w-28 pt-0.5">
+                {t("preview.field_currency", { defaultValue: "Currency" })}
+              </span>
+              {editing ? (
+                <input
+                  value={draft.currency}
+                  onChange={(e) => setDraft((d) => ({ ...d, currency: e.target.value.toUpperCase() }))}
+                  maxLength={4}
+                  placeholder="EUR"
+                  className="flex-1 min-w-0 text-xs text-black font-mono bg-amber-50 border border-amber-300 rounded px-2 py-1 outline-none focus:border-amber-500 uppercase"
+                />
+              ) : (
+                <span className="flex-1 min-w-0 text-xs text-black font-mono text-right">
+                  {receipt.currency ?? "EUR"}
+                </span>
+              )}
+            </div>
+            {!editing && (
+              <CurrencyConverter currency={rcCurrency} onRateChange={setConvRate} />
+            )}
             {editing ? (
               <div className="py-2 border-b border-black/10 flex items-center justify-between">
                 <span className="text-xs text-black/50 font-bold uppercase tracking-wider">{t("preview.split_vat")}</span>
@@ -1031,11 +1153,11 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
                 value={receipt.vat_percentage != null ? `${receipt.vat_percentage} %` : null}
                 editing={editing} inputValue={draft.vat_percentage}
                 onInput={(v) => setDraft((d) => ({ ...d, vat_percentage: v }))} />
-              <FieldRow label={t("preview.field_vat_amt")} value={fmt(receipt.vat_amount)}
+              <FieldRow label={t("preview.field_vat_amt")} value={cvt(receipt.vat_amount)}
                 editing={editing} inputValue={draft.vat_amount}
                 onInput={(v) => setDraft((d) => ({ ...d, vat_amount: v }))} />
             </>)}
-            <FieldRow label={t("preview.field_net")} value={fmt(receipt.net_amount)} />
+            <FieldRow label={t("preview.field_net")} value={cvt(receipt.net_amount)} />
           </div>
         </section>
 
@@ -1062,7 +1184,7 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
                   <div key={d.position}>
                     <ItemRow index={i}
                       item={{ description: d.description, position: d.position, quantity: null, unit_price: null, total_price: null, vat_rate: null, vat_amount: null, category: d.category } as ReceiptItem}
-                      editing={true} draft={d}
+                      editing={true} draft={d} currency={rcCurrency}
                       onChange={(field, value) => setItem(i, field, value)}
                       onDelete={() => setConfirmDeleteIdx(i)} />
                     {confirmDeleteIdx === i && (
@@ -1078,7 +1200,7 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
                 ))
               ) : (
                 (receipt.items ?? []).map((item, i) => (
-                  <ItemRow key={i} index={i} item={item} editing={false}
+                  <ItemRow key={i} index={i} item={item} editing={false} currency={rcCurrency}
                     draft={{ position: item.position ?? i+1, description: "", vat_rate: "", vat_amount: "", total_price: "", category: "other" }}
                     onChange={() => {}} onDelete={() => {}} />
                 ))

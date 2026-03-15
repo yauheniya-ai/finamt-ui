@@ -139,8 +139,8 @@
     "delete_item": "Position {{pos}} löschen?",
     "item_placeholder_description": "Beschreibung",
     "item_label_vat_pct": "MwSt. %",
-    "item_label_vat_amt": "MwSt. €",
-    "item_label_total": "Gesamt €",
+    "item_label_vat_amt": "MwSt. {{sym}}",
+    "item_label_total": "Gesamt {{sym}}",
     "item_vat_inline": "MwSt."
   },
   "dashboard": {

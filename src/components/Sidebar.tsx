@@ -49,6 +49,7 @@ export type Receipt = {
   vat_percentage: number | null;
   vat_amount:     number | null;
   net_amount:     number | null;
+  currency:       string;
   category:       string;
   items:          ReceiptItem[];
   pdf_url:        string | null;

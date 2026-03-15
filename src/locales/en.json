@@ -139,8 +139,8 @@
     "delete_item": "Delete item {{pos}}?",
     "item_placeholder_description": "Description",
     "item_label_vat_pct": "VAT %",
-    "item_label_vat_amt": "VAT €",
-    "item_label_total": "Total €",
+    "item_label_vat_amt": "VAT {{sym}}",
+    "item_label_total": "Total {{sym}}",
     "item_vat_inline": "VAT"
   },
   "dashboard": {
