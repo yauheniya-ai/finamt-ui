@@ -69,16 +69,12 @@ function CategoryChart({ title, totals, receipts }: {
                 return acc;
               }, {});
             const supplierEntries = Object.entries(supplierTotals).sort(([, a], [, b]) => b - a);
-            const hasMultiple = supplierEntries.length > 1;
-
             return (
               <div key={cat}>
                 {/* Category row */}
                 <div
-                  className={`flex items-center gap-3 py-2 rounded ${
-                    hasMultiple ? "cursor-pointer hover:bg-amber-50" : ""
-                  }`}
-                  onClick={() => hasMultiple && toggle(cat)}
+                  className="flex items-center gap-3 py-2 rounded cursor-pointer hover:bg-amber-50"
+                  onClick={() => toggle(cat)}
                 >
                   <span className="text-xs text-black/70 font-bold w-36 capitalize shrink-0 flex items-center gap-1.5 truncate">
                     {meta?.icon && <Icon icon={meta.icon} className="w-3.5 h-3.5 shrink-0" />}
@@ -92,16 +88,12 @@ function CategoryChart({ title, totals, receipts }: {
                   <span className="text-xs text-black font-black font-mono w-24 text-right shrink-0">
                     {fmt(total)}
                   </span>
-                  {hasMultiple ? (
-                    <Icon
-                      icon="mdi:chevron-down"
-                      className={`w-3.5 h-3.5 text-black/30 shrink-0 transition-transform ${
-                        isOpen ? "rotate-180" : ""
-                      }`}
-                    />
-                  ) : (
-                    <span className="w-3.5 shrink-0" />
-                  )}
+                  <Icon
+                    icon="mdi:chevron-down"
+                    className={`w-3.5 h-3.5 text-black/30 shrink-0 transition-transform ${
+                      isOpen ? "rotate-180" : ""
+                    }`}
+                  />
                 </div>
 
                 {/* Supplier breakdown */}
