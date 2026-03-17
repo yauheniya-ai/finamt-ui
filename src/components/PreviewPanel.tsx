@@ -452,21 +452,10 @@ function CounterpartiesExplorer({ apiBase, dbPath, onClose, onSelect }: {
         }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setList((prev) => prev.map((cp) => cp.id !== id ? cp : {
-        ...cp,
-        name:       editDraft.name       || null,
-        tax_number: editDraft.tax_number || null,
-        vat_id:     editDraft.vat_id     || null,
-        verified:   editDraft.verified,
-        address: {
-          street_and_number:  editDraft.street_and_number  || null,
-          address_supplement: editDraft.address_supplement || null,
-          postcode:           editDraft.postcode            || null,
-          city:               editDraft.city                || null,
-          state:              editDraft.state               || null,
-          country:            editDraft.country             || null,
-        },
-      }));
+      // Use the response body (ground-truth saved row) rather than editDraft so
+      // the list always reflects exactly what is stored in the DB.
+      const saved: AllCp = await res.json();
+      setList((prev) => prev.map((cp) => cp.id !== id ? cp : saved));
       setEditId(null);
       setEditDraft(null);
     } catch (e: unknown) {
@@ -988,9 +977,14 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
       {/* PDF thumbnail — hidden in fullscreen (PDF is full-width on left) */}
       {!pdfOpen && pdfUrl && (
         <div className="relative shrink-0 border-b-2 border-amber-400" style={{ height: 280 }}>
-          {isPdf(pdfUrl)
-            ? <iframe src={pdfUrl} className="w-full h-full bg-amber-50" title="Receipt PDF" />
-            : <img src={pdfUrl} className="w-full h-full object-contain bg-amber-50" alt="Receipt" />
+          {/* Do NOT render the iframe while the counterparty explorer is open.
+              Browser-native PDF viewer controls render outside the page z-index
+              stacking context and overlap the explorer modal's buttons. */}
+          {cpExplorerOpen
+            ? <div className="w-full h-full bg-amber-50" />
+            : isPdf(pdfUrl)
+              ? <iframe src={pdfUrl} className="w-full h-full bg-amber-50" title="Receipt PDF" />
+              : <img src={pdfUrl} className="w-full h-full object-contain bg-amber-50" alt="Receipt" />
           }
           <div className="absolute top-2 right-2 group">
             <button onClick={() => setPdfOpen(true)}
@@ -1264,13 +1258,15 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
                 </Tip>
               </div>
             </div>
-            {isPdf(pdfUrl)
-              ? <iframe src={pdfUrl} className="flex-1" title="Receipt PDF fullscreen" />
-              : (
-                <div className="flex-1 min-h-0 flex items-center justify-center bg-black overflow-hidden">
-                  <img src={pdfUrl} className="max-h-full max-w-full object-contain" alt="Receipt fullscreen" />
-                </div>
-              )
+            {cpExplorerOpen
+              ? <div className="flex-1 bg-black" />
+              : isPdf(pdfUrl)
+                ? <iframe src={pdfUrl} className="flex-1" title="Receipt PDF fullscreen" />
+                : (
+                  <div className="flex-1 min-h-0 flex items-center justify-center bg-black overflow-hidden">
+                    <img src={pdfUrl} className="max-h-full max-w-full object-contain" alt="Receipt fullscreen" />
+                  </div>
+                )
             }
           </div>
           {/* Data panel — same as normal, full editing available */}
