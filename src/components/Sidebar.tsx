@@ -59,12 +59,6 @@ export type Receipt = {
 };
 
 // ---------------------------------------------------------------------------
-// Shared metadata
-// ---------------------------------------------------------------------------
-
-// CATEGORY_META and REVENUE_CATS are imported from ../constants
-
-// ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
 
@@ -195,6 +189,25 @@ function CategoryGroup({
   const { t } = useTranslation();
   const catTotal = items.reduce((s, r) => s + (r.total_amount ?? 0), 0);
 
+  // Group receipts by supplier name
+  const supplierMap = items.reduce<Record<string, Receipt[]>>((acc, r) => {
+    const key = displayName(r);
+    (acc[key] ??= []).push(r);
+    return acc;
+  }, {});
+  const supplierEntries = Object.entries(supplierMap).sort(([a], [b]) => a.localeCompare(b));
+
+  // Track which supplier sub-groups are expanded (all closed by default)
+  const [expandedSuppliers, setExpandedSuppliers] = useState<Set<string>>(new Set());
+  const toggleSupplier = (name: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpandedSuppliers((prev) => {
+      const next = new Set(prev);
+      next.has(name) ? next.delete(name) : next.add(name);
+      return next;
+    });
+  };
+
   return (
     <div>
       <button
@@ -206,7 +219,7 @@ function CategoryGroup({
           <span className="truncate" title={t(`sidebar.categories.${meta.label}`, meta.label)}>{t(`sidebar.categories.${meta.label}`, meta.label)}</span>
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="text-black text-xs font-mono font-bold">{fmt(catTotal)}</span>
+          <span className="text-black text-xs font-mono font-black">{fmt(catTotal)}</span>
           <Icon
             icon="mdi:chevron-right"
             className={`w-3.5 h-3.5 text-black/30 transition-transform ${isOpen ? "rotate-90" : ""}`}
@@ -214,58 +227,80 @@ function CategoryGroup({
         </span>
       </button>
 
-      {isOpen && items.map((r) => (
-        <div
-          key={r.id}
-          onClick={() => onSelect(r)}
-          className={`relative flex items-start justify-between px-4 py-2 border-l-4 cursor-pointer group transition-colors ${
-            selectedId === r.id
-              ? "border-red-500 bg-red-50"
-              : "border-transparent hover:bg-red-50/50 hover:border-red-200"
-          }`}
-        >
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <span className={`shrink-0 text-[9px] font-black uppercase px-1 py-0.5 rounded leading-none ${
-                r.receipt_type === "sale"
-                  ? "bg-black text-amber-400"
-                  : "bg-amber-400 text-black"
-              }`}>
-                {r.receipt_type === "sale" ? "rev" : "exp"}
-              </span>
-              <span className="text-xs font-semibold text-black truncate">
-                {displayName(r)}
-              </span>
-            </div>
-            <div className="flex items-center justify-between mt-0.5">
-              <span className="text-xs text-black/40 font-mono">
-                {r.receipt_date ?? t("sidebar.no_date")}
-              </span>
-              <span className="text-xs text-black font-mono font-bold">
-                {fmt(r.total_amount)}
-              </span>
-            </div>
-          </div>
+      {isOpen && supplierEntries.map(([supplierName, supplierItems]) => {
+        const supplierTotal = supplierItems.reduce((s, r) => s + (r.total_amount ?? 0), 0);
+        const isSupplierOpen = expandedSuppliers.has(supplierName);
+        const hasSelectedItem = supplierItems.some((r) => r.id === selectedId);
 
-          {/* Delete button + confirmation popover */}
-          <div className="relative ml-2 shrink-0 mt-0.5">
+        return (
+          <div key={supplierName}>
+            {/* Supplier sub-header — compact row, total intentionally larger than per-receipt amounts */}
             <button
-              onClick={(e) => { e.stopPropagation(); onDeleteClick(r.id); }}
-              className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-all"
-              title="Delete"
+              onClick={(e) => toggleSupplier(supplierName, e)}
+              className={`w-full flex items-center justify-between pl-3 pr-3 py-1 text-left transition-colors border-b border-black/5 ${
+                hasSelectedItem ? "bg-red-50/60" : "hover:bg-red-50/40"
+              }`}
             >
-              <Icon icon="mdi:close" className="w-3.5 h-3.5" />
+              <span className="flex items-center gap-1 min-w-0">
+                <span className="text-[9px] font-black text-black/30 font-mono tabular-nums w-4 text-right shrink-0">
+                  {supplierItems.length}
+                </span>
+                <span className="text-[10px] font-bold text-black/70 truncate">{supplierName}</span>
+              </span>
+              <span className="flex items-center gap-1 shrink-0">
+                <span className="text-xs font-bold font-mono text-black">{fmt(supplierTotal)}</span>
+                <Icon
+                  icon="mdi:chevron-down"
+                  className={`w-3 h-3 text-black/30 transition-transform ${isSupplierOpen ? "rotate-180" : ""}`}
+                />
+              </span>
             </button>
 
-            {confirmingId === r.id && (
-              <DeleteConfirm
-                onConfirm={() => onDeleteConfirm(r.id)}
-                onCancel={onDeleteCancel}
-              />
-            )}
+            {/* Individual receipts under this supplier — single line: date · number · amount */}
+            {isSupplierOpen && supplierItems.map((r) => (
+              <div
+                key={r.id}
+                onClick={() => onSelect(r)}
+                className={`relative flex items-center justify-between pl-7 pr-3 py-1 border-l-4 cursor-pointer group transition-colors ${
+                  selectedId === r.id
+                    ? "border-red-500 bg-red-50"
+                    : "border-transparent hover:bg-red-50/50 hover:border-red-200"
+                }`}
+              >
+                <div className="flex-1 min-w-0 flex items-center gap-2">
+                  <span className="text-[11px] text-black/50 font-mono shrink-0">
+                    {r.receipt_date ?? t("sidebar.no_date")}
+                  </span>
+                  <span className="text-[11px] text-black/30 font-mono truncate min-w-0">
+                    {r.receipt_number ?? ""}
+                  </span>
+                </div>
+                <span className="text-[11px] text-black/60 font-mono font-bold shrink-0 ml-2">
+                  {fmt(r.total_amount)}
+                </span>
+
+                {/* Delete button + confirmation popover */}
+                <div className="relative ml-2 shrink-0 mt-0.5">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onDeleteClick(r.id); }}
+                    className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-all"
+                    title="Delete"
+                  >
+                    <Icon icon="mdi:close" className="w-3.5 h-3.5" />
+                  </button>
+
+                  {confirmingId === r.id && (
+                    <DeleteConfirm
+                      onConfirm={() => onDeleteConfirm(r.id)}
+                      onCancel={onDeleteCancel}
+                    />
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -285,7 +320,7 @@ function SectionDivider({ label, count, total, isRevenue }: { label: string; cou
           {count}
         </span>
       </span>
-      <span className="text-[10px] font-mono font-bold">{fmt(total)}</span>
+      <span className="text-xs font-mono font-black">{fmt(total)}</span>
     </div>
   );
 }
@@ -375,7 +410,7 @@ export default function Sidebar({
   };
 
   return (
-    <aside className="w-60 shrink-0 bg-white border-r-2 border-red-500 flex flex-col overflow-hidden">
+    <aside className="w-70 shrink-0 bg-white border-r-2 border-red-500 flex flex-col overflow-hidden">
 
       {/* Upload */}
       <div className="p-3 border-b border-black/10 flex flex-col gap-2">

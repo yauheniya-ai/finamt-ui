@@ -698,6 +698,7 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
   const [itemDrafts,       setItemDrafts]       = useState<DraftItem[]>([]);
   const [verifyConfirm,    setVerifyConfirm]    = useState(false);
   const [localVerified,    setLocalVerified]    = useState<boolean | null>(null);
+  const [pendingCpLink,    setPendingCpLink]    = useState<string | null>(null);
   const [convRate,         setConvRate]         = useState<number | null>(null);
   const [draft, setDraft] = useState<Record<string, string>>({
     counterparty_name: "", vat_id: "", tax_number: "",
@@ -817,6 +818,7 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
       address_state:            cp.address?.state             ?? d.address_state,
       address_country:          cp.address?.country           ?? d.address_country,
     }));
+    setPendingCpLink(cp.id);  // re-link receipt to this verified CP on next save
     setLocalVerified(true);
   };
 
@@ -848,6 +850,7 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
       if (draft.vat_id)     payload.vat_id     = draft.vat_id;
       if (draft.tax_number) payload.tax_number = draft.tax_number;
       if (localVerified !== null) payload.counterparty_verified = localVerified;
+      if (pendingCpLink) payload.counterparty_id = pendingCpLink;
       const addr: Record<string, string> = {};
       (["street_and_number","address_supplement","postcode","city","state","country"] as const).forEach((k, i) => {
         const v = draft[["address_street_and_number","address_address_supplement","address_postcode","address_city","address_state","address_country"][i]];
@@ -876,6 +879,7 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
       });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail ?? `HTTP ${res.status}`);
       const updated = await res.json();
+      setPendingCpLink(null);
       setSavedVisible(true); setEditing(false); onSaved?.(updated);
       setTimeout(() => setSavedVisible(false), 3500);
     } catch (err: unknown) {
