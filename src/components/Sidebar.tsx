@@ -9,11 +9,12 @@ import { CATEGORY_META, REVENUE_CATS } from "../constants";
 // ---------------------------------------------------------------------------
 
 export type Address = {
-  street_and_number: string | null;
-  postcode:          string | null;
-  city:              string | null;
-  state:             string | null;
-  country:           string | null;
+  street_and_number:  string | null;
+  address_supplement: string | null;
+  postcode:           string | null;
+  city:               string | null;
+  state:              string | null;
+  country:            string | null;
 };
 
 export type Counterparty = {
@@ -80,7 +81,7 @@ export function displayName(r: Receipt): string {
 
 export function formatAddress(addr: Address | null | undefined): string | null {
   if (!addr) return null;
-  return [addr.street_and_number, addr.postcode && addr.city ? `${addr.postcode} ${addr.city}` : addr.postcode || addr.city, addr.state, addr.country].filter(Boolean).join(", ") || null;
+  return [addr.street_and_number, addr.address_supplement, addr.postcode && addr.city ? `${addr.postcode} ${addr.city}` : addr.postcode || addr.city, addr.state, addr.country].filter(Boolean).join(", ") || null;
 }
 
 // ---------------------------------------------------------------------------

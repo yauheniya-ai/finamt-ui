@@ -308,7 +308,7 @@ function VatSplitRow({ split, editing, draft, onChange, onDelete }: {
 type VerifiedCp = {
   id: string; name: string | null; tax_number: string | null; vat_id: string | null;
   verified: boolean;
-  address: { street_and_number: string | null; postcode: string | null; city: string | null; state: string | null; country: string | null };
+  address: { street_and_number: string | null; address_supplement: string | null; postcode: string | null; city: string | null; state: string | null; country: string | null };
 };
 
 function VerifiedPicker({ apiBase, dbPath, onSelect, onManage }: {
@@ -380,19 +380,20 @@ function VerifiedPicker({ apiBase, dbPath, onSelect, onManage }: {
 type AllCp = VerifiedCp & { created_at?: string | null };
 type CpDraft = {
   name: string; tax_number: string; vat_id: string; verified: boolean;
-  street_and_number: string; postcode: string; city: string; state: string; country: string;
+  street_and_number: string; address_supplement: string; postcode: string; city: string; state: string; country: string;
 };
 
 const cpToDraft = (cp: AllCp): CpDraft => ({
-  name:              cp.name              ?? "",
-  tax_number:        cp.tax_number        ?? "",
-  vat_id:            cp.vat_id            ?? "",
-  verified:          cp.verified,
-  street_and_number: cp.address?.street_and_number ?? "",
-  postcode:          cp.address?.postcode           ?? "",
-  city:              cp.address?.city               ?? "",
-  state:             cp.address?.state              ?? "",
-  country:           cp.address?.country            ?? "",
+  name:               cp.name               ?? "",
+  tax_number:         cp.tax_number         ?? "",
+  vat_id:             cp.vat_id             ?? "",
+  verified:           cp.verified,
+  street_and_number:  cp.address?.street_and_number  ?? "",
+  address_supplement: cp.address?.address_supplement ?? "",
+  postcode:           cp.address?.postcode            ?? "",
+  city:               cp.address?.city                ?? "",
+  state:              cp.address?.state               ?? "",
+  country:            cp.address?.country             ?? "",
 });
 
 function CounterpartiesExplorer({ apiBase, dbPath, onClose, onSelect }: {
@@ -441,11 +442,12 @@ function CounterpartiesExplorer({ apiBase, dbPath, onClose, onSelect }: {
           vat_id:     editDraft.vat_id     || null,
           verified:   editDraft.verified,
           address: {
-            street_and_number: editDraft.street_and_number || null,
-            postcode:          editDraft.postcode           || null,
-            city:              editDraft.city               || null,
-            state:             editDraft.state              || null,
-            country:           editDraft.country            || null,
+            street_and_number:  editDraft.street_and_number  || null,
+            address_supplement: editDraft.address_supplement || null,
+            postcode:           editDraft.postcode            || null,
+            city:               editDraft.city                || null,
+            state:              editDraft.state               || null,
+            country:            editDraft.country             || null,
           },
         }),
       });
@@ -457,11 +459,12 @@ function CounterpartiesExplorer({ apiBase, dbPath, onClose, onSelect }: {
         vat_id:     editDraft.vat_id     || null,
         verified:   editDraft.verified,
         address: {
-          street_and_number: editDraft.street_and_number || null,
-          postcode:          editDraft.postcode           || null,
-          city:              editDraft.city               || null,
-          state:             editDraft.state              || null,
-          country:           editDraft.country            || null,
+          street_and_number:  editDraft.street_and_number  || null,
+          address_supplement: editDraft.address_supplement || null,
+          postcode:           editDraft.postcode            || null,
+          city:               editDraft.city                || null,
+          state:              editDraft.state               || null,
+          country:            editDraft.country             || null,
         },
       }));
       setEditId(null);
@@ -549,6 +552,7 @@ function CounterpartiesExplorer({ apiBase, dbPath, onClose, onSelect }: {
                         </div>
                         <div className="flex gap-3 mt-0.5 flex-wrap">
                           {cp.address?.street_and_number && <span className="text-[10px] text-black/40">{cp.address.street_and_number}</span>}
+                          {cp.address?.address_supplement && <span className="text-[10px] text-black/40">{cp.address.address_supplement}</span>}
                           {(cp.address?.postcode || cp.address?.city) && (
                             <span className="text-[10px] text-black/40">{[cp.address.postcode, cp.address.city].filter(Boolean).join(" ")}</span>
                           )}
@@ -607,8 +611,9 @@ function CounterpartiesExplorer({ apiBase, dbPath, onClose, onSelect }: {
                           </label>
                         </div>
                         <div className="grid grid-cols-2 gap-3 mb-4">
-                          {inp(t("preview.cp_field_street"),   "street_and_number")}
-                          {inp(t("preview.cp_field_postcode"), "postcode")}
+                          {inp(t("preview.cp_field_street"),             "street_and_number")}
+                          {inp(t("preview.cp_field_address_supplement"), "address_supplement")}
+                          {inp(t("preview.cp_field_postcode"),           "postcode")}
                           {inp(t("preview.cp_field_city"),     "city")}
                           {inp(t("preview.cp_field_state"),    "state")}
                           {inp(t("preview.cp_field_country"),  "country")}
@@ -707,7 +712,7 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
   const [convRate,         setConvRate]         = useState<number | null>(null);
   const [draft, setDraft] = useState<Record<string, string>>({
     counterparty_name: "", vat_id: "", tax_number: "",
-    address_street_and_number: "", address_postcode: "",
+    address_street_and_number: "", address_address_supplement: "", address_postcode: "",
     address_city: "", address_state: "", address_country: "",
     receipt_number: "", receipt_date: "", receipt_type: "purchase",
     total_amount: "", vat_percentage: "", vat_amount: "", category: "", currency: "",
@@ -747,8 +752,9 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
       counterparty_name:        counterpartyName ?? "",
       vat_id:                   receipt.counterparty?.vat_id     ?? "",
       tax_number:               receipt.counterparty?.tax_number ?? "",
-      address_street_and_number: addr?.street_and_number ?? "",
-      address_postcode:         addr?.postcode      ?? "",
+      address_street_and_number:  addr?.street_and_number  ?? "",
+      address_address_supplement: addr?.address_supplement ?? "",
+      address_postcode:           addr?.postcode            ?? "",
       address_city:             addr?.city          ?? "",
       address_state:            addr?.state         ?? "",
       address_country:          addr?.country       ?? "",
@@ -815,7 +821,8 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
       counterparty_name:        cp.name                      ?? d.counterparty_name,
       vat_id:                   cp.vat_id                    ?? d.vat_id,
       tax_number:               cp.tax_number                ?? d.tax_number,
-      address_street_and_number: cp.address?.street_and_number ?? d.address_street_and_number,
+      address_street_and_number:  cp.address?.street_and_number  ?? d.address_street_and_number,
+      address_address_supplement: cp.address?.address_supplement ?? d.address_address_supplement,
       address_postcode:         cp.address?.postcode          ?? d.address_postcode,
       address_city:             cp.address?.city              ?? d.address_city,
       address_state:            cp.address?.state             ?? d.address_state,
@@ -853,8 +860,8 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
       if (draft.tax_number) payload.tax_number = draft.tax_number;
       if (localVerified !== null) payload.counterparty_verified = localVerified;
       const addr: Record<string, string> = {};
-      (["street_and_number","postcode","city","state","country"] as const).forEach((k, i) => {
-        const v = draft[["address_street_and_number","address_postcode","address_city","address_state","address_country"][i]];
+      (["street_and_number","address_supplement","postcode","city","state","country"] as const).forEach((k, i) => {
+        const v = draft[["address_street_and_number","address_address_supplement","address_postcode","address_city","address_state","address_country"][i]];
         if (v) addr[k] = v;
       });
       if (Object.keys(addr).length) payload["address"] = addr;
@@ -1034,6 +1041,9 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
               <FieldRow label={t("preview.field_street_and_number")} value={receipt.counterparty?.address?.street_and_number}
                 editing={editing} inputValue={draft.address_street_and_number}
                 onInput={(v) => setDraft((d) => ({ ...d, address_street_and_number: v }))} />
+              <FieldRow label={t("preview.field_address_supplement")} value={receipt.counterparty?.address?.address_supplement}
+                editing={editing} inputValue={draft.address_address_supplement}
+                onInput={(v) => setDraft((d) => ({ ...d, address_address_supplement: v }))} />
               <FieldRow label={t("preview.field_postcode")} value={receipt.counterparty?.address?.postcode}
                 editing={editing} inputValue={draft.address_postcode}
                 onInput={(v) => setDraft((d) => ({ ...d, address_postcode: v }))} />
