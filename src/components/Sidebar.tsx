@@ -309,9 +309,12 @@ function CategoryGroup({
 // Section divider
 // ---------------------------------------------------------------------------
 
-function SectionDivider({ label, count, total, isRevenue }: { label: string; count: number; total: number; isRevenue: boolean }) {
+function SectionDivider({ label, count, total, isRevenue, isOpen, onToggle }: { label: string; count: number; total: number; isRevenue: boolean; isOpen: boolean; onToggle: () => void }) {
   return (
-    <div className="flex items-center justify-between px-3 py-1.5">
+    <button
+      onClick={onToggle}
+      className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-black/5 transition-colors"
+    >
       <span className="flex items-center gap-1.5">
         <span className={`text-[10px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded ${isRevenue ? "bg-black text-amber-400" : "bg-amber-400 text-black"}`}>
           {label}
@@ -320,8 +323,14 @@ function SectionDivider({ label, count, total, isRevenue }: { label: string; cou
           {count}
         </span>
       </span>
-      <span className="text-xs font-mono font-black">{fmt(total)}</span>
-    </div>
+      <span className="flex items-center gap-1.5">
+        <span className="text-xs font-mono font-black">{fmt(total)}</span>
+        <Icon
+          icon="mdi:chevron-down"
+          className={`w-3.5 h-3.5 text-black/30 transition-transform ${isOpen ? "" : "-rotate-90"}`}
+        />
+      </span>
+    </button>
   );
 }
 
@@ -337,6 +346,8 @@ export default function Sidebar({
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [collapsed,    setCollapsed]    = useState<Set<string>>(new Set());
+  const [revenueOpen,  setRevenueOpen]  = useState(true);
+  const [expensesOpen, setExpensesOpen] = useState(true);
   const { t } = useTranslation();
   const [uploadType,   setUploadType]   = useState<"purchase" | "sale">("purchase");
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
@@ -547,20 +558,20 @@ export default function Sidebar({
         {/* Revenue section */}
         {sales.length > 0 && (
           <>
-            <SectionDivider label={t("sidebar.revenue")} count={sales.length} total={saleTotal} isRevenue={true} />
-            {revenueCats.map(([cat, meta]) => renderGroup(cat, meta, "sale"))}
+            <SectionDivider label={t("sidebar.revenue")} count={sales.length} total={saleTotal} isRevenue={true} isOpen={revenueOpen} onToggle={() => setRevenueOpen((v) => !v)} />
+            {revenueOpen && revenueCats.map(([cat, meta]) => renderGroup(cat, meta, "sale"))}
             {/* Revenue items that fell into expense categories */}
-            {expenseCats.map(([cat, meta]) => renderGroup(cat, meta, "sale"))}
+            {revenueOpen && expenseCats.map(([cat, meta]) => renderGroup(cat, meta, "sale"))}
           </>
         )}
 
         {/* Expense section */}
         {purchases.length > 0 && (
           <>
-            <SectionDivider label={t("sidebar.expenses")} count={purchases.length} total={purchaseTotal} isRevenue={false} />
-            {expenseCats.map(([cat, meta]) => renderGroup(cat, meta, "purchase"))}
+            <SectionDivider label={t("sidebar.expenses")} count={purchases.length} total={purchaseTotal} isRevenue={false} isOpen={expensesOpen} onToggle={() => setExpensesOpen((v) => !v)} />
+            {expensesOpen && expenseCats.map(([cat, meta]) => renderGroup(cat, meta, "purchase"))}
             {/* Purchase receipts that fell into revenue categories (e.g. "services" bought) */}
-            {revenueCats.map(([cat, meta]) => renderGroup(cat, meta, "purchase"))}
+            {expensesOpen && revenueCats.map(([cat, meta]) => renderGroup(cat, meta, "purchase"))}
           </>
         )}
 
