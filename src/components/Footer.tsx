@@ -62,15 +62,7 @@ export default function Footer() {
 
       <div className="text-xs text-black/70 font-mono">
         <span>
-          © {new Date().getFullYear()} —{" "}
-          <a
-            href="https://github.com/yauheniya-ai/finamt/blob/main/LICENSE"
-            target="_blank"
-            rel="noreferrer"
-            className="hover:text-red-500 transition-colors"
-          >
-            MIT LICENSE
-          </a>
+          v{__APP_VERSION__}
         </span>
       </div>
     </footer>

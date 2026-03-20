@@ -122,7 +122,7 @@ function DeleteConfirm({ onConfirm, onCancel }: { onConfirm: () => void; onCance
   const { t } = useTranslation();
   return (
     <div
-      className="absolute right-0 top-6 z-20 bg-white border-2 border-black rounded shadow-lg p-3 flex flex-col gap-2 w-44"
+      className="absolute right-0 top-6 z-20 bg-white border-1 border-black rounded shadow-lg p-3 flex flex-col gap-2 w-55"
       onClick={(e) => e.stopPropagation()}
     >
       <p className="text-xs font-bold text-black leading-snug">
@@ -242,7 +242,7 @@ function CategoryGroup({
               }`}
             >
               <span className="flex items-center gap-1 min-w-0">
-                <span className="text-[9px] font-black text-black/30 font-mono tabular-nums w-4 text-right shrink-0">
+                <span className="text-[11px] font-black text-black/30 font-mono tabular-nums w-4 text-right shrink-0">
                   {supplierItems.length}
                 </span>
                 <span className="text-[10px] font-bold text-black/70 truncate">{supplierName}</span>
