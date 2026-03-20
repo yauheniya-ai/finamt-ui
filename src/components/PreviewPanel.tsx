@@ -3,6 +3,7 @@ import { Icon } from "@iconify/react";
 import type { Receipt, ReceiptItem } from "./Sidebar";
 import { fmt, CATEGORY_META } from "./Sidebar";
 import type { CategoryMeta } from "./Sidebar";
+import { CATEGORY_SUBCATEGORIES } from "../constants";
 import { useTranslation } from "react-i18next";
 
 type Props = {
@@ -102,6 +103,94 @@ function CategorySelect({ value, onChange }: { value: string; onChange: (v: stri
               </li>
             ))}
           </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SubcategorySelect
+// ---------------------------------------------------------------------------
+function SubcategorySelect({
+  category, value, onChange,
+}: { category: string; value: string; onChange: (v: string) => void }) {
+  const { t } = useTranslation();
+  const [customInput, setCustomInput] = useState("");
+  const [showCustom,  setShowCustom]  = useState(false);
+
+  const builtIn = CATEGORY_SUBCATEGORIES[category] ?? [];
+  // Collect custom entries stored in localStorage per category
+  const storageKey = `finamt_subcats_${category}`;
+  const getCustom = (): string[] => {
+    try { return JSON.parse(localStorage.getItem(storageKey) ?? "[]"); } catch { return []; }
+  };
+  const saveCustom = (list: string[]) =>
+    localStorage.setItem(storageKey, JSON.stringify(list));
+
+  const [extraSubs, setExtraSubs] = useState<string[]>(getCustom);
+
+  const allSubs = [...builtIn, ...extraSubs.filter((s) => !builtIn.includes(s))];
+
+  const handleSelect = (v: string) => {
+    onChange(v);
+    setShowCustom(false);
+  };
+
+  const handleAddCustom = () => {
+    const trimmed = customInput.trim();
+    if (!trimmed) return;
+    if (!allSubs.includes(trimmed)) {
+      const updated = [...extraSubs, trimmed];
+      setExtraSubs(updated);
+      saveCustom(updated);
+    }
+    onChange(trimmed);
+    setCustomInput("");
+    setShowCustom(false);
+  };
+
+  return (
+    <div className="flex items-start justify-between gap-3 py-2 border-b border-black/10">
+      <span className="text-xs text-black/50 font-bold uppercase tracking-wider shrink-0 w-28 pt-0.5">
+        {t("preview.field_subcategory", { defaultValue: "Subcategory" })}
+      </span>
+      <div className="relative flex-1 min-w-0 flex flex-col gap-1">
+        <div className="flex gap-1">
+          <select
+            value={value}
+            onChange={(e) => handleSelect(e.target.value)}
+            className="flex-1 text-xs font-mono text-black bg-amber-50 border border-amber-300 rounded px-2 py-1 outline-none focus:border-amber-500"
+          >
+            <option value="">—</option>
+            {allSubs.map((s) => (
+              <option key={s} value={s}>{t(`sidebar.subcategories.${s}`, { defaultValue: s })}</option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => setShowCustom((o) => !o)}
+            className="text-[10px] font-bold text-black/50 hover:text-black border border-black/20 hover:border-black px-2 rounded transition-colors"
+            title={t("preview.subcategory_add_custom", { defaultValue: "Add custom" })}
+          >
+            <Icon icon="mdi:plus" className="w-3.5 h-3.5" />
+          </button>
+        </div>
+        {showCustom && (
+          <div className="flex gap-1">
+            <input
+              autoFocus
+              value={customInput}
+              onChange={(e) => setCustomInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleAddCustom(); if (e.key === "Escape") setShowCustom(false); }}
+              placeholder={t("preview.subcategory_placeholder", { defaultValue: "Custom subcategory…" })}
+              className="flex-1 text-xs font-mono text-black bg-white border border-amber-400 rounded px-2 py-1 outline-none focus:border-amber-500"
+            />
+            <button type="button" onClick={handleAddCustom}
+              className="text-[10px] font-black bg-black text-white px-2 rounded hover:bg-black/80 transition-colors">
+              {t("preview.btn_add", { defaultValue: "Add" })}
+            </button>
+          </div>
         )}
       </div>
     </div>
@@ -705,7 +794,7 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
     address_street_and_number: "", address_address_supplement: "", address_postcode: "",
     address_city: "", address_state: "", address_country: "",
     receipt_number: "", receipt_date: "", receipt_type: "purchase",
-    total_amount: "", vat_percentage: "", vat_amount: "", category: "", currency: "",
+    total_amount: "", vat_percentage: "", vat_amount: "", category: "", subcategory: "", currency: "",
   });
 
   // Reset local overrides whenever we switch to a different receipt
@@ -755,6 +844,7 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
       vat_percentage:        receipt.vat_percentage?.toString() ?? "",
       vat_amount:            receipt.vat_amount?.toString()     ?? "",
       category:              receipt.category ?? "",
+      subcategory:           receipt.subcategory ?? "",
       currency:              receipt.currency ?? "EUR",
     });
     setItemDrafts(
@@ -842,7 +932,10 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
       for (const [k, v] of [
         ["counterparty_name", draft.counterparty_name], ["receipt_number", draft.receipt_number],
         ["receipt_date", draft.receipt_date], ["receipt_type", draft.receipt_type], ["category", draft.category],
+        ["subcategory", draft.subcategory],
       ] as [string, string][]) { if (v) payload[k] = v; }
+      // Allow clearing subcategory when empty
+      if (draft.subcategory === "") payload["subcategory"] = null;
       for (const [k, v] of [
         ["total_amount", draft.total_amount], ["vat_percentage", draft.vat_percentage], ["vat_amount", draft.vat_amount],
       ] as [string, string][]) { if (v) payload[k] = parseFloat(v); }
@@ -1078,12 +1171,16 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
                     <option value="sale">{t("preview.type_sale")}</option>
                   </select>
                 </div>
-                <CategorySelect value={draft.category} onChange={(v) => setDraft((d) => ({ ...d, category: v }))} />
+                <CategorySelect value={draft.category} onChange={(v) => setDraft((d) => ({ ...d, category: v, subcategory: "" }))} />
+                <SubcategorySelect category={draft.category} value={draft.subcategory} onChange={(v) => setDraft((d) => ({ ...d, subcategory: v }))} />
               </>
             ) : (
               <>
                 <FieldRow label={t("preview.field_type")} value={receipt.receipt_type === "sale" ? t("preview.badge_revenue") : t("preview.badge_expense")} />
                 <FieldRow label={t("preview.field_category")} value={t(`sidebar.categories.${receipt.category}`, { defaultValue: receipt.category })} />
+                {receipt.subcategory && (
+                  <FieldRow label={t("preview.field_subcategory", { defaultValue: "Subcategory" })} value={t(`sidebar.subcategories.${receipt.subcategory}`, { defaultValue: receipt.subcategory ?? "" })} />
+                )}
               </>
             )}
           </div>

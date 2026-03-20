@@ -58,6 +58,17 @@ export default function Footer() {
           Documentation
         </a>
 
+        {/* CHANGELOG */}
+        <a
+          href="https://github.com/yauheniya-ai/finamt/blob/main/CHANGELOG.md"
+          target="_blank"
+          rel="noreferrer"
+          className="flex items-center gap-1 hover:text-red-500 transition-colors"
+        >
+          <Icon icon="octicon:log-16" className="w-4 h-4" />
+          Changelog
+        </a>
+
       </div>
 
       <div className="text-xs text-black/70 font-mono">

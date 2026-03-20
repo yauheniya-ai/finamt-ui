@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import i18n from "../i18n";
 import { Icon } from "@iconify/react";
-import { CATEGORY_META, REVENUE_CATS } from "../constants";
+import { CATEGORY_META } from "../constants";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -52,6 +52,7 @@ export type Receipt = {
   net_amount:     number | null;
   currency:       string;
   category:       string;
+  subcategory:    string | null;
   items:          ReceiptItem[];
   pdf_url:        string | null;
   duplicate?:     boolean;
@@ -385,9 +386,8 @@ export default function Sidebar({
   const purchaseTotal = purchases.reduce((s, r) => s + (r.total_amount ?? 0), 0);
   const saleTotal     = sales.reduce((s, r) => s + (r.total_amount ?? 0), 0);
 
-  // Category entries split by section, preserving CATEGORY_META order
-  const revenueCats  = Object.entries(CATEGORY_META).filter(([cat]) => REVENUE_CATS.has(cat));
-  const expenseCats  = Object.entries(CATEGORY_META).filter(([cat]) => !REVENUE_CATS.has(cat));
+  // Category entries preserving CATEGORY_META order
+  const allCats = Object.entries(CATEGORY_META);
 
   const renderGroup = (cat: string, meta: { label: string; icon: string }, type: "purchase" | "sale") => {
     const items = (grouped[cat] ?? [])
@@ -559,9 +559,7 @@ export default function Sidebar({
         {sales.length > 0 && (
           <>
             <SectionDivider label={t("sidebar.revenue")} count={sales.length} total={saleTotal} isRevenue={true} isOpen={revenueOpen} onToggle={() => setRevenueOpen((v) => !v)} />
-            {revenueOpen && revenueCats.map(([cat, meta]) => renderGroup(cat, meta, "sale"))}
-            {/* Revenue items that fell into expense categories */}
-            {revenueOpen && expenseCats.map(([cat, meta]) => renderGroup(cat, meta, "sale"))}
+            {revenueOpen && allCats.map(([cat, meta]) => renderGroup(cat, meta, "sale"))}
           </>
         )}
 
@@ -569,9 +567,7 @@ export default function Sidebar({
         {purchases.length > 0 && (
           <>
             <SectionDivider label={t("sidebar.expenses")} count={purchases.length} total={purchaseTotal} isRevenue={false} isOpen={expensesOpen} onToggle={() => setExpensesOpen((v) => !v)} />
-            {expensesOpen && expenseCats.map(([cat, meta]) => renderGroup(cat, meta, "purchase"))}
-            {/* Purchase receipts that fell into revenue categories (e.g. "services" bought) */}
-            {expensesOpen && revenueCats.map(([cat, meta]) => renderGroup(cat, meta, "purchase"))}
+            {expensesOpen && allCats.map(([cat, meta]) => renderGroup(cat, meta, "purchase"))}
           </>
         )}
 
