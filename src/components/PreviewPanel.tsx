@@ -418,12 +418,16 @@ function VerifiedPicker({ apiBase, dbPath, onSelect, onManage }: {
       .then((d) => {
         const raw: VerifiedCp[] = d.counterparties ?? [];
         const seen = new Set<string>();
-        setList(raw.filter((cp) => {
+        const deduped = raw.filter((cp) => {
           const key = cp.vat_id?.trim() || (cp.name ?? "");
           if (seen.has(key)) return false;
           seen.add(key);
           return true;
-        }));
+        });
+        deduped.sort((a, b) =>
+          (a.name ?? "").localeCompare(b.name ?? "", undefined, { sensitivity: "base" })
+        );
+        setList(deduped);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -439,6 +443,13 @@ function VerifiedPicker({ apiBase, dbPath, onSelect, onManage }: {
       </button>
       {open && (
         <div className="mt-2 border border-black/10 rounded overflow-hidden">
+          {onManage && !loading && (
+            <button onClick={() => { setOpen(false); onManage(); }}
+              className="w-full text-left px-3 py-2 text-[10px] font-bold text-black/40 hover:text-black hover:bg-black/5 flex items-center gap-1.5 border-b border-black/10 transition-colors">
+              <Icon icon="mdi:table-account" className="w-3.5 h-3.5" />
+              {t("preview.manage_counterparties")}
+            </button>
+          )}
           {loading ? (
             <div className="px-3 py-2 text-xs text-black/30 font-mono">{t("preview.loading")}</div>
           ) : list.length === 0 ? (
@@ -450,13 +461,6 @@ function VerifiedPicker({ apiBase, dbPath, onSelect, onManage }: {
               <div className="text-[10px] text-black/40 font-mono">{cp.vat_id ?? cp.tax_number ?? ""}</div>
             </button>
           ))}
-          {onManage && !loading && (
-            <button onClick={() => { setOpen(false); onManage(); }}
-              className="w-full text-left px-3 py-2 text-[10px] font-bold text-black/40 hover:text-black hover:bg-black/5 flex items-center gap-1.5 border-t border-black/10 transition-colors">
-              <Icon icon="mdi:table-account" className="w-3.5 h-3.5" />
-              {t("preview.manage_counterparties")}
-            </button>
-          )}
         </div>
       )}
     </div>
@@ -868,6 +872,7 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
     } else {
       setSplitVat(false); setVatSplitDrafts([]);
     }
+    setLocalVerified(null);
     setSavedVisible(false); setSaveErr(null); setEditing(true);
   };
 
