@@ -792,6 +792,10 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
   const [verifyConfirm,    setVerifyConfirm]    = useState(false);
   const [localVerified,    setLocalVerified]    = useState<boolean | null>(null);
   const [pendingCpLink,    setPendingCpLink]    = useState<string | null>(null);
+  const [reassignOpen,     setReassignOpen]     = useState(false);
+  const [reassignName,     setReassignName]     = useState("");
+  const [reassignVatId,    setReassignVatId]    = useState("");
+  const [reassigning,      setReassigning]      = useState(false);
   const [convRate,         setConvRate]         = useState<number | null>(null);
   const [draft, setDraft] = useState<Record<string, string>>({
     counterparty_name: "", vat_id: "", tax_number: "",
@@ -810,6 +814,8 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
     setSavedVisible(false);
     setSaveErr(null);
     setConvRate(null);
+    setReassignOpen(false);
+    setReassignName(""); setReassignVatId("");
   }, [receipt?.id]);
 
   if (!receipt) return <EmptyState />;
@@ -917,6 +923,31 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
     }));
     setPendingCpLink(cp.id);  // re-link receipt to this verified CP on next save
     setLocalVerified(true);
+  };
+
+  const handleReassign = async () => {
+    if (!reassignName.trim()) return;
+    setReassigning(true);
+    try {
+      const res = await fetch(`${apiBase}/receipts/${receipt.id}/counterparty${qs(dbPath)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name:   reassignName.trim() || null,
+          vat_id: reassignVatId.trim() || null,
+        }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const updated = await res.json();
+      setReassignOpen(false);
+      setReassignName(""); setReassignVatId("");
+      setEditing(false); setSaveErr(null);
+      onSaved?.(updated);
+    } catch (e: unknown) {
+      setSaveErr(e instanceof Error ? e.message : "Reassign failed.");
+    } finally {
+      setReassigning(false);
+    }
   };
 
   const doVerify = async (newVal: boolean) => {
@@ -1125,6 +1156,40 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
           </div>
           <div className="border-2 border-black rounded px-3 py-1">
             {editing && <VerifiedPicker apiBase={apiBase} dbPath={dbPath} onSelect={applyVerifiedCp} onManage={() => setCpExplorerOpen(true)} />}
+            {editing && (
+              <div className="py-2 border-b border-black/10">
+                <button onClick={() => setReassignOpen((o) => !o)}
+                  className="flex items-center gap-1.5 text-[10px] font-bold text-black/60 hover:text-black uppercase tracking-wider transition-colors">
+                  <Icon icon="mdi:swap-horizontal" className="w-3.5 h-3.5" />
+                  {t("preview.cp_reassign")}
+                  <Icon icon={reassignOpen ? "mdi:chevron-up" : "mdi:chevron-down"} className="w-3 h-3" />
+                </button>
+                {reassignOpen && (
+                  <div className="mt-2 flex flex-col gap-1.5">
+                    <p className="text-[9px] text-black/40 font-mono leading-relaxed">
+                      Creates or finds a supplier and links <em>only this receipt</em> to it — the current supplier stays linked to all other receipts.
+                    </p>
+                    <input
+                      value={reassignName}
+                      onChange={(e) => setReassignName(e.target.value)}
+                      placeholder={t("preview.cp_reassign_name_placeholder")}
+                      className="w-full text-xs font-mono text-black bg-white border border-amber-300 rounded px-2 py-1 outline-none focus:border-amber-500"
+                    />
+                    <input
+                      value={reassignVatId}
+                      onChange={(e) => setReassignVatId(e.target.value)}
+                      placeholder={t("preview.cp_reassign_vat_placeholder")}
+                      className="w-full text-xs font-mono text-black bg-white border border-black/20 rounded px-2 py-1 outline-none focus:border-amber-500"
+                    />
+                    <button onClick={handleReassign} disabled={reassigning || !reassignName.trim()}
+                      className="self-start text-[11px] font-black bg-black text-white px-3 py-1 rounded hover:bg-black/80 disabled:opacity-40 transition-colors flex items-center gap-1.5">
+                      {reassigning && <Icon icon="svg-spinners:12-dots-scale-rotate" className="w-3 h-3" />}
+                      {t("preview.cp_reassign_btn")}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
             <FieldRow label={t("preview.field_name")} value={counterpartyName}
               editing={editing} inputValue={draft.counterparty_name}
               onInput={(v) => setDraft((d) => ({ ...d, counterparty_name: v }))} />
