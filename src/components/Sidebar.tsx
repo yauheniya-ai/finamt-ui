@@ -25,6 +25,17 @@ export type Counterparty = {
   vat_id:     string | null;
 };
 
+export type TaxpayerProfile = {
+  name:       string;
+  vat_id:     string;
+  tax_number: string;
+  street:     string;
+  postcode:   string;
+  city:       string;
+  state:      string;
+  country:    string;
+};
+
 export type ReceiptItem = {
   position:    number | null;
   description: string;
@@ -119,6 +130,133 @@ export function filterByPeriod(receipts: Receipt[], period: PeriodFilter): Recei
 }
 
 // ---------------------------------------------------------------------------
+// Taxpayer data modal
+// ---------------------------------------------------------------------------
+
+export function TaxpayerModal({ initial, onSave, onClear, onClose }: {
+  initial:  TaxpayerProfile | null;
+  onSave:   (tp: TaxpayerProfile) => void;
+  onClear:  () => void;
+  onClose:  () => void;
+}) {
+  const { t } = useTranslation();
+  const [form, setForm] = useState<TaxpayerProfile>({
+    name:       initial?.name       ?? "",
+    vat_id:     initial?.vat_id     ?? "",
+    tax_number: initial?.tax_number ?? "",
+    street:     initial?.street     ?? "",
+    postcode:   initial?.postcode   ?? "",
+    city:       initial?.city       ?? "",
+    state:      initial?.state      ?? "",
+    country:    initial?.country    ?? "",
+  });
+  const set = (key: keyof TaxpayerProfile) =>
+    (e: React.ChangeEvent<HTMLInputElement>) =>
+      setForm((prev) => ({ ...prev, [key]: e.target.value }));
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white border-2 border-red-500 rounded p-5 w-80 flex flex-col gap-3 shadow-xl max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h4 className="text-black text-sm font-black uppercase tracking-wider">
+          {t("sidebar.taxpayer_modal_title")}
+        </h4>
+
+        {/* Name, VAT ID, Tax Number */}
+        {(["name", "vat_id", "tax_number"] as (keyof TaxpayerProfile)[]).map((key) => (
+          <div key={key} className="flex flex-col gap-1">
+            <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider">
+              {t(`sidebar.taxpayer_${key}`)}
+            </label>
+            <input
+              type="text"
+              value={form[key]}
+              onChange={set(key)}
+              className="border border-black/20 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-amber-400"
+              placeholder={t(`sidebar.taxpayer_${key}`)}
+            />
+          </div>
+        ))}
+
+        {/* Address section */}
+        <div className="flex flex-col gap-1.5 pt-1 border-t border-black/5">
+          <span className="text-[10px] text-black/40 font-bold uppercase tracking-wider">
+            {t("sidebar.taxpayer_address")}
+          </span>
+          <input
+            type="text"
+            value={form.street}
+            onChange={set("street")}
+            className="border border-black/20 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-amber-400"
+            placeholder={t("sidebar.taxpayer_street")}
+          />
+          <div className="flex gap-1.5">
+            <input
+              type="text"
+              value={form.postcode}
+              onChange={set("postcode")}
+              className="border border-black/20 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-amber-400 w-24"
+              placeholder={t("sidebar.taxpayer_postcode")}
+            />
+            <input
+              type="text"
+              value={form.city}
+              onChange={set("city")}
+              className="border border-black/20 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-amber-400 flex-1"
+              placeholder={t("sidebar.taxpayer_city")}
+            />
+          </div>
+          <div className="flex gap-1.5">
+            <input
+              type="text"
+              value={form.state}
+              onChange={set("state")}
+              className="border border-black/20 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-amber-400 flex-1"
+              placeholder={t("sidebar.taxpayer_state")}
+            />
+            <input
+              type="text"
+              value={form.country}
+              onChange={set("country")}
+              className="border border-black/20 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-amber-400 flex-1"
+              placeholder={t("sidebar.taxpayer_country")}
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-2 mt-1">
+          <button
+            onClick={() => onSave(form)}
+            className="flex-1 bg-black text-amber-400 text-xs font-bold py-1.5 rounded hover:bg-black/80 transition-colors"
+          >
+            {t("sidebar.taxpayer_save")}
+          </button>
+          {initial && (
+            <button
+              onClick={onClear}
+              className="bg-red-500 text-white hover:bg-red-600 text-xs font-bold py-1.5 px-3 rounded transition-colors"
+            >
+              {t("sidebar.taxpayer_clear")}
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="bg-black/5 hover:bg-black/10 text-black/50 text-xs font-bold py-1.5 px-3 rounded transition-colors"
+          >
+            {t("sidebar.taxpayer_close")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Delete confirmation popover
 // ---------------------------------------------------------------------------
 
@@ -158,16 +296,18 @@ function DeleteConfirm({ onConfirm, onCancel }: { onConfirm: () => void; onCance
 // ---------------------------------------------------------------------------
 
 type Props = {
-  receipts:        Receipt[];
-  selectedId:      string | null;
-  onSelect:        (receipt: Receipt) => void;
-  onUpload:        (files: File[], type: "purchase" | "sale") => void;
-  onDelete:        (id: string) => void;
-  uploading:       boolean;
-  progressStep?:   string | null;
-  error?:          string | null;
-  period:          PeriodFilter;
-  onPeriodChange:  (p: PeriodFilter) => void;
+  receipts:         Receipt[];
+  selectedId:       string | null;
+  onSelect:         (receipt: Receipt) => void;
+  onUpload:         (files: File[], type: "purchase" | "sale") => void;
+  onDelete:         (id: string) => void;
+  uploading:        boolean;
+  progressStep?:    string | null;
+  error?:           string | null;
+  period:           PeriodFilter;
+  onPeriodChange:   (p: PeriodFilter) => void;
+  taxpayer:         TaxpayerProfile | null;
+  onEditTaxpayer:   () => void;
 };
 
 // ---------------------------------------------------------------------------
@@ -346,15 +486,15 @@ function SectionDivider({ label, count, total, isRevenue, isOpen, onToggle }: { 
 
 export default function Sidebar({
   receipts, selectedId, onSelect, onUpload, onDelete, uploading, progressStep, error,
-  period, onPeriodChange,
+  period, onPeriodChange, taxpayer, onEditTaxpayer,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [collapsed,    setCollapsed]    = useState<Set<string>>(new Set());
-  const [revenueOpen,  setRevenueOpen]  = useState(true);
-  const [expensesOpen, setExpensesOpen] = useState(true);
+  const [collapsed,       setCollapsed]       = useState<Set<string>>(new Set());
+  const [revenueOpen,     setRevenueOpen]     = useState(true);
+  const [expensesOpen,    setExpensesOpen]    = useState(true);
   const { t } = useTranslation();
-  const [uploadType,   setUploadType]   = useState<"purchase" | "sale">("purchase");
-  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [uploadType,      setUploadType]      = useState<"purchase" | "sale">("purchase");
+  const [confirmingId,    setConfirmingId]    = useState<string | null>(null);
 
   const grouped = receipts.reduce<Record<string, Receipt[]>>((acc, r) => {
     // Normalize any category not in CATEGORY_META to "other" so it always renders
@@ -470,6 +610,21 @@ export default function Sidebar({
           className="hidden"
           onChange={handleChange}
         />
+
+        {/* Taxpayer data */}
+        {!taxpayer?.name && (
+          <div className="pt-1 border-t border-black/5">
+            <p className="text-[10px] text-black/40 font-mono leading-relaxed mb-1">
+              {t("sidebar.taxpayer_hint")}
+            </p>
+            <button
+              onClick={onEditTaxpayer}
+              className="text-[10px] text-black/50 hover:text-black font-bold underline underline-offset-2"
+            >
+              {t("sidebar.taxpayer_btn")}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Error */}

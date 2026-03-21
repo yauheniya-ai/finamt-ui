@@ -134,7 +134,23 @@
       "membership_fees": "Mitgliedsbeiträge",
       "sundry": "Sonstiges"
     },
-    "revenues": "Einnahmen"
+    "revenues": "Einnahmen",
+    "taxpayer_hint": "Gib deine Daten an, damit die KI dich nicht mit dem Geschäftspartner verwechselt.",
+    "taxpayer_btn": "Meine Steuerpflichtigen-Daten einrichten",
+    "taxpayer_edit_btn": "Bearbeiten",
+    "taxpayer_modal_title": "Deine Steuerpflichtigen-Daten",
+    "taxpayer_name": "Name / Unternehmen",
+    "taxpayer_vat_id": "USt-IdNr.",
+    "taxpayer_tax_number": "Steuernummer",
+    "taxpayer_address": "Adresse",
+    "taxpayer_street": "Straße & Nr.",
+    "taxpayer_postcode": "PLZ",
+    "taxpayer_city": "Ort",
+    "taxpayer_state": "Bundesland",
+    "taxpayer_country": "Land",
+    "taxpayer_save": "Speichern",
+    "taxpayer_clear": "Löschen",
+    "taxpayer_close": "Schließen"
   },
   "preview": {
     "empty": "Wähle einen Beleg aus der Seitenleiste\naus, um ihn hier anzuzeigen.",

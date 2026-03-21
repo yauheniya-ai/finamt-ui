@@ -134,7 +134,23 @@
       "membership_fees": "Membership fees",
       "sundry": "Sundry"
     },
-    "revenues": "Revenue"
+    "revenues": "Revenue",
+    "taxpayer_hint": "Provide your data so the AI won’t confuse you with the counterparty.",
+    "taxpayer_btn": "Set up my taxpayer data",
+    "taxpayer_edit_btn": "Edit",
+    "taxpayer_modal_title": "Your Taxpayer Data",
+    "taxpayer_name": "Name / Company",
+    "taxpayer_vat_id": "VAT ID (USt-IdNr.)",
+    "taxpayer_tax_number": "Tax Number (Steuernr.)",
+    "taxpayer_address": "Address",
+    "taxpayer_street": "Street & No.",
+    "taxpayer_postcode": "Postcode",
+    "taxpayer_city": "City",
+    "taxpayer_state": "State / Region",
+    "taxpayer_country": "Country",
+    "taxpayer_save": "Save",
+    "taxpayer_clear": "Clear",
+    "taxpayer_close": "Close"
   },
   "preview": {
     "empty": "Select a receipt from the sidebar\nto preview it here.",

@@ -1,12 +1,21 @@
 import { useState, useCallback, useEffect } from "react";
 import Header from "./components/Header";
-import Sidebar, { type Receipt, type PeriodFilter, DEFAULT_PERIOD, filterByPeriod } from "./components/Sidebar";
+import Sidebar, { type Receipt, type PeriodFilter, type TaxpayerProfile, TaxpayerModal, DEFAULT_PERIOD, filterByPeriod } from "./components/Sidebar";
 import Dashboard from "./components/Dashboard";
 import PreviewPanel from "./components/PreviewPanel";
 import { type DBInfo } from "./components/DBSelector";
 import Footer from "./components/Footer";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "";
+
+const taxpayerKey = (db: string | null) => `finamt_taxpayer:${db ?? "__default__"}`;
+
+function loadTaxpayer(db: string | null): TaxpayerProfile | null {
+  try {
+    const saved = localStorage.getItem(taxpayerKey(db));
+    return saved ? (JSON.parse(saved) as TaxpayerProfile) : null;
+  } catch { return null; }
+}
 
 export default function App() {
   const [receipts,  setReceipts]  = useState<Receipt[]>([]);
@@ -16,6 +25,19 @@ export default function App() {
   const [error,     setError]     = useState<string | null>(null);
   const [activeDb,  setActiveDb]  = useState<string | null>(null);
   const [period,    setPeriod]    = useState<PeriodFilter>(DEFAULT_PERIOD);
+  const [taxpayer,  setTaxpayer]  = useState<TaxpayerProfile | null>(() => loadTaxpayer(null));
+  const [showTaxpayerModal, setShowTaxpayerModal] = useState(false);
+
+  // Reload taxpayer whenever the active DB changes
+  useEffect(() => {
+    setTaxpayer(loadTaxpayer(activeDb));
+  }, [activeDb]);
+
+  const handleTaxpayerChange = useCallback((tp: TaxpayerProfile | null) => {
+    setTaxpayer(tp);
+    if (tp) localStorage.setItem(taxpayerKey(activeDb), JSON.stringify(tp));
+    else    localStorage.removeItem(taxpayerKey(activeDb));
+  }, [activeDb]);
 
   const dbQs = activeDb ? `?db=${encodeURIComponent(activeDb)}` : "";
 
@@ -43,7 +65,10 @@ export default function App() {
       try {
         const body = new FormData();
         body.append("file", file);
-        const url = `${API_BASE}/receipts/upload/stream?receipt_type=${type}${activeDb ? `&db=${encodeURIComponent(activeDb)}` : ""}`;
+        const tqs = taxpayer
+          ? `&taxpayer_name=${encodeURIComponent(taxpayer.name)}&taxpayer_vat_id=${encodeURIComponent(taxpayer.vat_id)}&taxpayer_tax_number=${encodeURIComponent(taxpayer.tax_number)}&taxpayer_address=${encodeURIComponent([taxpayer.street, [taxpayer.postcode, taxpayer.city].filter(Boolean).join(" "), taxpayer.state, taxpayer.country].filter(Boolean).join(", "))}`
+          : "";
+        const url = `${API_BASE}/receipts/upload/stream?receipt_type=${type}${activeDb ? `&db=${encodeURIComponent(activeDb)}` : ""}${tqs}`;
         const res = await fetch(url, { method: "POST", body });
         if (!res.ok || !res.body) throw new Error((await res.json()).detail ?? "Upload failed.");
 
@@ -97,7 +122,7 @@ export default function App() {
 
     setUploading(false);
     setProgressStep(null);
-  }, [activeDb, dbQs]);
+  }, [activeDb, dbQs, taxpayer]);
 
   const handleDelete = useCallback(async (id: string) => {
     try {
@@ -147,8 +172,15 @@ export default function App() {
           error={null}
           period={period}
           onPeriodChange={setPeriod}
+          taxpayer={taxpayer}
+          onEditTaxpayer={() => setShowTaxpayerModal(true)}
         />
-        <Dashboard receipts={visibleReceipts} period={period} />
+        <Dashboard
+          receipts={visibleReceipts}
+          period={period}
+          taxpayer={taxpayer}
+          onEditTaxpayer={() => setShowTaxpayerModal(true)}
+        />
         <PreviewPanel
           receipt={selected}
           apiBase={API_BASE}
@@ -158,6 +190,15 @@ export default function App() {
       </div>
 
       <Footer />
+
+      {showTaxpayerModal && (
+        <TaxpayerModal
+          initial={taxpayer}
+          onSave={(tp) => { handleTaxpayerChange(tp); setShowTaxpayerModal(false); }}
+          onClear={() => { handleTaxpayerChange(null); setShowTaxpayerModal(false); }}
+          onClose={() => setShowTaxpayerModal(false)}
+        />
+      )}
     </div>
   );
 }

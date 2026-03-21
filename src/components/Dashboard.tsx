@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
-import type { Receipt, PeriodFilter } from "./Sidebar";
+import type { Receipt, PeriodFilter, TaxpayerProfile } from "./Sidebar";
 import { CATEGORY_META, fmt, displayName } from "./Sidebar";
 import type { CategoryMeta } from "./Sidebar";
 
-type Props = { receipts: Receipt[]; period: PeriodFilter };
+type Props = { receipts: Receipt[]; period: PeriodFilter; taxpayer?: TaxpayerProfile | null; onEditTaxpayer?: () => void };
 
 // ---------------------------------------------------------------------------
 // Stat card
@@ -150,7 +150,7 @@ function VatRow({ line, label, sublabel, base, tax, bold }: {
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
-export default function Dashboard({ receipts, period }: Props) {
+export default function Dashboard({ receipts, period, taxpayer, onEditTaxpayer }: Props) {
   const { t } = useTranslation();
 
   // ── Period label ────────────────────────────────────────────────────────
@@ -196,9 +196,38 @@ export default function Dashboard({ receipts, period }: Props) {
     <main className="flex-1 overflow-y-auto bg-amber-50 p-6 flex flex-col gap-6">
 
       {/* Header */}
-      <div className="border-b-2 border-amber-400 pb-3">
-        <h2 className="text-black text-xl font-black uppercase tracking-tight">{t("dashboard.title")}</h2>
-        <p className="text-black/50 text-xs font-mono mt-0.5">{periodLabel}</p>
+      <div className="border-b-2 border-amber-400 pb-3 flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-black text-xl font-black uppercase tracking-tight">{t("dashboard.title")}</h2>
+          <p className="text-black/50 text-xs font-mono mt-0.5">{periodLabel}</p>
+        </div>
+        {taxpayer?.name && (
+          <div className="text-right shrink-0">
+            <p className="text-black text-xs font-bold font-mono">
+              {taxpayer.name}
+              {(taxpayer.vat_id || taxpayer.tax_number) && (
+                <span className="text-black/50 font-normal ml-1.5">
+                  ({[taxpayer.vat_id, taxpayer.tax_number].filter(Boolean).join(" • ")})
+                </span>
+              )}
+            </p>
+            <div className="flex items-baseline justify-end gap-2 mt-0.5">
+              {(taxpayer.street || taxpayer.city) && (
+                <p className="text-black/50 text-[11px] font-mono">
+                  {[taxpayer.street, [taxpayer.postcode, taxpayer.city].filter(Boolean).join(" "), taxpayer.state, taxpayer.country].filter(Boolean).join(", ")}
+                </p>
+              )}
+              {onEditTaxpayer && (
+                <button
+                  onClick={onEditTaxpayer}
+                  className="text-[10px] text-black/30 hover:text-black font-bold underline underline-offset-2 shrink-0"
+                >
+                  {t("sidebar.taxpayer_edit_btn")}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Stat cards */}
