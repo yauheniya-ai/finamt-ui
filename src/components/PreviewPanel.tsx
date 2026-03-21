@@ -799,6 +799,7 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
     address_city: "", address_state: "", address_country: "",
     receipt_number: "", receipt_date: "", receipt_type: "purchase",
     total_amount: "", vat_percentage: "", vat_amount: "", category: "", subcategory: "", currency: "",
+    private_use_share: "0",
   });
 
   // Reset local overrides whenever we switch to a different receipt
@@ -850,6 +851,7 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
       category:              receipt.category ?? "",
       subcategory:           receipt.subcategory ?? "",
       currency:              receipt.currency ?? "EUR",
+      private_use_share:     String(Math.round((receipt.private_use_share ?? 0) * 100)),
     });
     setItemDrafts(
       (receipt.items ?? []).map((item, i) => ({
@@ -944,6 +946,13 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
       for (const [k, v] of [
         ["total_amount", draft.total_amount], ["vat_percentage", draft.vat_percentage], ["vat_amount", draft.vat_amount],
       ] as [string, string][]) { if (v) payload[k] = parseFloat(v); }
+      // private_use_share: store as 0–1 decimal (draft holds 0–100 percent)
+      if (draft.receipt_type === "purchase") {
+        const pus = parseFloat(draft.private_use_share);
+        payload.private_use_share = isNaN(pus) ? 0 : Math.max(0, Math.min(1, pus / 100));
+      } else {
+        payload.private_use_share = 0;
+      }
       if (draft.currency) payload.currency = draft.currency.toUpperCase();
       if (draft.vat_id)     payload.vat_id     = draft.vat_id;
       if (draft.tax_number) payload.tax_number = draft.tax_number;
@@ -1268,6 +1277,70 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
                 onInput={(v) => setDraft((d) => ({ ...d, vat_amount: v }))} />
             </>)}
             <FieldRow label={t("preview.field_net")} value={cvt(receipt.net_amount)} />
+
+            {/* Private Use — edit mode slider (purchases only) */}
+            {editing && draft.receipt_type === "purchase" && (
+              <div className="flex items-start justify-between gap-3 py-2 border-b border-black/10 last:border-0">
+                <div className="flex items-center gap-1 shrink-0 w-28">
+                  <span className="text-xs text-black/50 font-bold uppercase tracking-wider leading-tight">
+                    {t("preview.field_private_use")}
+                  </span>
+                  <Tip label={t("preview.private_use_tooltip")} pos="bottom-right">
+                    <Icon icon="mdi:information-outline" className="w-3 h-3 text-black/30 cursor-default" />
+                  </Tip>
+                </div>
+                <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range" min="0" max="100" step="1"
+                      value={draft.private_use_share}
+                      onChange={(e) => setDraft((d) => ({ ...d, private_use_share: e.target.value }))}
+                      className="flex-1 accent-amber-500 cursor-pointer"
+                    />
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      <input
+                        type="number" min="0" max="100" step="1"
+                        value={draft.private_use_share}
+                        onChange={(e) => {
+                          const n = parseInt(e.target.value);
+                          setDraft((d) => ({ ...d, private_use_share: String(isNaN(n) ? 0 : Math.max(0, Math.min(100, n))) }));
+                        }}
+                        className="w-12 text-xs font-mono text-black bg-amber-50 border border-amber-300 rounded px-1.5 py-1 outline-none focus:border-amber-500 text-center"
+                      />
+                      <span className="text-xs text-black/50 font-mono">%</span>
+                    </div>
+                  </div>
+                  {parseFloat(draft.private_use_share) > 0 && (() => {
+                    const gross = parseFloat(draft.total_amount) || 0;
+                    const vat   = parseFloat(draft.vat_amount)   || 0;
+                    const biz   = (100 - parseFloat(draft.private_use_share)) / 100;
+                    const sym   = currSymbol(draft.currency || "EUR");
+                    return (
+                      <div className="text-[10px] font-mono text-black/40 flex gap-3">
+                        <span>{t("preview.field_business_net")}: {sym} {((gross - vat) * biz).toFixed(2)}</span>
+                        <span>{t("preview.field_business_vat")}: {sym} {(vat * biz).toFixed(2)}</span>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            )}
+
+            {/* Private Use — display mode (purchases with share > 0 only) */}
+            {!editing && receipt.receipt_type === "purchase" && (receipt.private_use_share ?? 0) > 0 && (
+              <>
+                <FieldRow
+                  label={t("preview.field_private_use")}
+                  value={`${((receipt.private_use_share ?? 0) * 100).toFixed(0)} %`}
+                />
+                {receipt.business_vat != null && (
+                  <FieldRow label={t("preview.field_business_vat")} value={cvt(receipt.business_vat)} />
+                )}
+                {receipt.business_net != null && (
+                  <FieldRow label={t("preview.field_business_net")} value={cvt(receipt.business_net)} />
+                )}
+              </>
+            )}
           </div>
         </section>
 

@@ -46,11 +46,14 @@ export type Receipt = {
   counterparty:   Counterparty | null;
   receipt_number: string | null;
   receipt_date:   string | null;
-  total_amount:   number | null;
-  vat_percentage: number | null;
-  vat_amount:     number | null;
-  net_amount:     number | null;
-  currency:       string;
+  total_amount:      number | null;
+  vat_percentage:    number | null;
+  vat_amount:        number | null;
+  net_amount:        number | null;
+  private_use_share: number;          // 0–1; default 0
+  business_net:      number | null;
+  business_vat:      number | null;
+  currency:          string;
   category:       string;
   subcategory:    string | null;
   items:          ReceiptItem[];
