@@ -30,67 +30,73 @@ export default function App() {
   // Filtered view — passed to Sidebar + Dashboard
   const visibleReceipts = filterByPeriod(receipts, period);
 
-  const handleUpload = useCallback(async (file: File, type: "purchase" | "sale" = "purchase") => {
+  const handleUpload = useCallback(async (files: File[], type: "purchase" | "sale" = "purchase") => {
     setUploading(true);
     setProgressStep(null);
     setError(null);
-    try {
-      const body = new FormData();
-      body.append("file", file);
-      const url = `${API_BASE}/receipts/upload/stream?receipt_type=${type}${activeDb ? `&db=${encodeURIComponent(activeDb)}` : ""}`;
-      const res = await fetch(url, { method: "POST", body });
-      if (!res.ok || !res.body) throw new Error((await res.json()).detail ?? "Upload failed.");
+    let lastReceipt: Receipt | null = null;
+    const total = files.length;
+    for (let i = 0; i < total; i++) {
+      const file = files[i];
+      const prefix = total > 1 ? `[${i + 1}/${total}] ` : "";
+      setProgressStep(prefix + "...");
+      try {
+        const body = new FormData();
+        body.append("file", file);
+        const url = `${API_BASE}/receipts/upload/stream?receipt_type=${type}${activeDb ? `&db=${encodeURIComponent(activeDb)}` : ""}`;
+        const res = await fetch(url, { method: "POST", body });
+        if (!res.ok || !res.body) throw new Error((await res.json()).detail ?? "Upload failed.");
 
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buf = "";
-      let receipt: Receipt | null = null;
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = "";
 
-      outer: while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-        const parts = buf.split("\n\n");
-        buf = parts.pop() ?? "";
-        for (const part of parts) {
-          const lines = part.split("\n");
-          let eventType = "message";
-          let data = "";
-          for (const line of lines) {
-            if (line.startsWith("event: ")) eventType = line.slice(7).trim();
-            else if (line.startsWith("data: ")) data = line.slice(6).trim();
-          }
-          if (eventType === "progress") {
-            const msg: string = JSON.parse(data);
-            // Only surface the steps the user cares about
-            const m = msg.match(/→\s+(PyMuPDF|PaddleOCR|Tesseract|Agent\s+([1-4]))/);
-            if (m) {
-              const label = m[2]
-                ? `Agent ${m[2]}/4`
-                : m[1].replace(/\s+/, " ");
-              setProgressStep(label + "...");
+        outer: while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          const parts = buf.split("\n\n");
+          buf = parts.pop() ?? "";
+          for (const part of parts) {
+            const lines = part.split("\n");
+            let eventType = "message";
+            let data = "";
+            for (const line of lines) {
+              if (line.startsWith("event: ")) eventType = line.slice(7).trim();
+              else if (line.startsWith("data: ")) data = line.slice(6).trim();
             }
-          } else if (eventType === "result") {
-            receipt = JSON.parse(data) as Receipt;
-            break outer;
-          } else if (eventType === "error") {
-            throw new Error(JSON.parse(data));
+            if (eventType === "progress") {
+              const msg: string = JSON.parse(data);
+              const m = msg.match(/→\s+(PyMuPDF|PaddleOCR|Tesseract|Agent\s+([1-4]))/);
+              if (m) {
+                const label = m[2] ? `Agent ${m[2]}/4` : m[1].replace(/\s+/, " ");
+                setProgressStep(prefix + label + "...");
+              }
+            } else if (eventType === "result") {
+              lastReceipt = JSON.parse(data) as Receipt;
+              break outer;
+            } else if (eventType === "error") {
+              throw new Error(JSON.parse(data));
+            }
           }
         }
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : "Upload failed.";
+        setError(total > 1 ? `${file.name}: ${msg}` : msg);
+        // Continue processing remaining files
       }
-
-      if (receipt) {
-        const listRes = await fetch(`${API_BASE}/receipts${dbQs}`);
-        const listData = await listRes.json();
-        setReceipts(listData.receipts ?? []);
-        setSelected(receipt);
-      }
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Upload failed.");
-    } finally {
-      setUploading(false);
-      setProgressStep(null);
     }
+
+    // Refresh list once after all files processed
+    try {
+      const listRes = await fetch(`${API_BASE}/receipts${dbQs}`);
+      const listData = await listRes.json();
+      setReceipts(listData.receipts ?? []);
+      if (lastReceipt) setSelected(lastReceipt);
+    } catch { /* ignore */ }
+
+    setUploading(false);
+    setProgressStep(null);
   }, [activeDb, dbQs]);
 
   const handleDelete = useCallback(async (id: string) => {

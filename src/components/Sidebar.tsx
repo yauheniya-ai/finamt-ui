@@ -161,7 +161,7 @@ type Props = {
   receipts:        Receipt[];
   selectedId:      string | null;
   onSelect:        (receipt: Receipt) => void;
-  onUpload:        (file: File, type: "purchase" | "sale") => void;
+  onUpload:        (files: File[], type: "purchase" | "sale") => void;
   onDelete:        (id: string) => void;
   uploading:       boolean;
   progressStep?:   string | null;
@@ -371,8 +371,8 @@ export default function Sidebar({
     });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) onUpload(file, uploadType);
+    const files = Array.from(e.target.files ?? []);
+    if (files.length) onUpload(files, uploadType);
     e.target.value = "";
   };
 
@@ -465,6 +465,7 @@ export default function Sidebar({
         <input
           ref={inputRef}
           type="file"
+          multiple
           accept="image/jpeg,image/png,image/webp,image/tiff,application/pdf"
           className="hidden"
           onChange={handleChange}
