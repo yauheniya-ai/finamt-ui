@@ -99,6 +99,11 @@ export default function App() {
               }
             } else if (eventType === "result") {
               lastReceipt = JSON.parse(data) as Receipt;
+              // Update sidebar immediately so each completed receipt appears live
+              setReceipts((prev) => [
+                lastReceipt!,
+                ...prev.filter((r) => r.id !== lastReceipt!.id),
+              ]);
               break outer;
             } else if (eventType === "error") {
               throw new Error(JSON.parse(data));
