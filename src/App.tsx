@@ -66,7 +66,7 @@ export default function App() {
         const body = new FormData();
         body.append("file", file);
         const tqs = taxpayer
-          ? `&taxpayer_name=${encodeURIComponent(taxpayer.name)}&taxpayer_vat_id=${encodeURIComponent(taxpayer.vat_id)}&taxpayer_tax_number=${encodeURIComponent(taxpayer.tax_number)}&taxpayer_address=${encodeURIComponent([taxpayer.street, [taxpayer.postcode, taxpayer.city].filter(Boolean).join(" "), taxpayer.state, taxpayer.country].filter(Boolean).join(", "))}`
+          ? `&taxpayer_name=${encodeURIComponent(taxpayer.name)}&taxpayer_vat_id=${encodeURIComponent(taxpayer.vat_id)}&taxpayer_tax_number=${encodeURIComponent(taxpayer.tax_number)}&taxpayer_street=${encodeURIComponent(taxpayer.street)}&taxpayer_postcode=${encodeURIComponent(taxpayer.postcode)}&taxpayer_city=${encodeURIComponent(taxpayer.city)}&taxpayer_state=${encodeURIComponent(taxpayer.state)}&taxpayer_country=${encodeURIComponent(taxpayer.country)}`
           : "";
         const url = `${API_BASE}/receipts/upload/stream?receipt_type=${type}${activeDb ? `&db=${encodeURIComponent(activeDb)}` : ""}${tqs}`;
         const res = await fetch(url, { method: "POST", body });

@@ -614,10 +614,22 @@ function CounterpartiesExplorer({ apiBase, dbPath, onClose, onSelect }: {
             <div className="p-6 text-xs text-black/30 font-mono text-center">{t("preview.cp_no_records")}</div>
           ) : (
             <div className="divide-y divide-black/10">
-              {list.map((cp) => {
-                const isEditing = editId === cp.id;
-                return (
-                  <div key={cp.id} className={isEditing ? "bg-amber-50/60" : "hover:bg-black/[.02]"}>
+              {(() => {
+                const vatCount: Record<string, number> = {};
+                list.forEach((c) => {
+                  if (c.vat_id?.trim()) {
+                    const k = c.vat_id.trim().toLowerCase();
+                    vatCount[k] = (vatCount[k] ?? 0) + 1;
+                  }
+                });
+                const dupVatIds = new Set(
+                  Object.entries(vatCount).filter(([, n]) => n > 1).map(([k]) => k)
+                );
+                return list.map((cp) => {
+                  const isEditing = editId === cp.id;
+                  const isDupVat  = !!(cp.vat_id?.trim() && dupVatIds.has(cp.vat_id.trim().toLowerCase()));
+                  return (
+                    <div key={cp.id} className={isEditing ? "bg-amber-50/60" : "hover:bg-black/[.02]"}>
                     {/* Summary row */}
                     <div className="px-4 py-3 flex items-start gap-3">
                       {/* Main info */}
@@ -629,7 +641,19 @@ function CounterpartiesExplorer({ apiBase, dbPath, onClose, onSelect }: {
                           )}
                         </div>
                         <div className="flex gap-3 mt-0.5 flex-wrap">
-                          {cp.vat_id    && <span className="text-[10px] text-black/50 font-mono">{cp.vat_id}</span>}
+                          {cp.vat_id && (
+                            <span className={`text-[10px] font-mono flex items-center gap-1 ${
+                              isDupVat ? "text-red-500 font-bold" : "text-black/50"
+                            }`}>
+                              {isDupVat && <Icon icon="mdi:alert" className="w-2.5 h-2.5 shrink-0" />}
+                              {cp.vat_id}
+                              {isDupVat && (
+                                <span className="text-[9px] font-black uppercase tracking-wider">
+                                  {t("preview.dup_vat_hint", { defaultValue: "duplicate" })}
+                                </span>
+                              )}
+                            </span>
+                          )}
                           {cp.tax_number && <span className="text-[10px] text-black/40 font-mono">{cp.tax_number}</span>}
                         </div>
                         <div className="flex gap-3 mt-0.5 flex-wrap">
@@ -732,7 +756,8 @@ function CounterpartiesExplorer({ apiBase, dbPath, onClose, onSelect }: {
                     )}
                   </div>
                 );
-              })}
+              });
+              })()}
             </div>
           )}
         </div>
@@ -797,6 +822,8 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
   const [reassignVatId,    setReassignVatId]    = useState("");
   const [reassigning,      setReassigning]      = useState(false);
   const [convRate,         setConvRate]         = useState<number | null>(null);
+  const [warnDismissed,    setWarnDismissed]    = useState(false);
+  const [warnConfirmPending, setWarnConfirmPending] = useState(false);
   const [draft, setDraft] = useState<Record<string, string>>({
     counterparty_name: "", vat_id: "", tax_number: "",
     address_street_and_number: "", address_address_supplement: "", address_postcode: "",
@@ -816,6 +843,8 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
     setConvRate(null);
     setReassignOpen(false);
     setReassignName(""); setReassignVatId("");
+    setWarnDismissed(false);
+    setWarnConfirmPending(false);
   }, [receipt?.id]);
 
   if (!receipt) return <EmptyState />;
@@ -824,7 +853,11 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
   const pdfUrl = receipt.pdf_url ? `${apiBase}${receipt.pdf_url}${qs(dbPath)}` : null;
   const receiptSplits = ((receipt as Receipt & { vat_splits?: { position: number; vat_rate: number | null; vat_amount: number | null; net_amount: number | null }[] }).vat_splits ?? []);
   const cpVerifiedFromReceipt = !!(receipt.counterparty as (typeof receipt.counterparty & { verified?: boolean }))?.verified;
-  const isVerified = localVerified !== null ? localVerified : cpVerifiedFromReceipt;
+  // isVerified is ONLY true when the user has explicitly confirmed it this session.
+  // cpVerifiedFromReceipt (DB state) is shown as a separate read-only badge — it must
+  // never auto-check the box, because the backend can auto-link new receipts to an already-
+  // verified counterparty without any user confirmation.
+  const isVerified = localVerified === true;
   const cpId = receipt.counterparty?.id ?? null;
   // Receipt currency (default EUR)
   const rcCurrency = receipt.currency ?? "EUR";
@@ -1026,8 +1059,21 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
   };
 
   // ── Verified checkbox widget (always shown) ─────────────────────────────
+  // RULE: the checkbox is only checked when the user explicitly confirmed it
+  // (localVerified === true).  If the DB counterparty is already marked
+  // verified but the user has NOT confirmed it in this session, we show a
+  // read-only amber badge instead — never auto-setting the tick.
   const verifiedWidget = (
     <div className="flex items-center gap-1.5">
+      {/* Read-only badge: counterparty is verified in DB but user hasn't ticked it yet */}
+      {cpVerifiedFromReceipt && !isVerified && !verifyConfirm && (
+        <Tip label={t("preview.verified_db_hint", { defaultValue: "Counterparty is marked verified – click ✓ to confirm for this receipt" })} pos="bottom-right">
+          <span className="flex items-center gap-1 bg-amber-200 text-black/60 text-[9px] font-black px-1.5 py-0.5 rounded uppercase leading-none select-none">
+            <Icon icon="mdi:check-circle-outline" className="w-2.5 h-2.5" />
+            {t("preview.verified")}
+          </span>
+        </Tip>
+      )}
       {verifyConfirm ? (
         <span className="flex items-center gap-1.5 text-[10px] font-bold text-black">
           {t("preview.confirm_verified")}
@@ -1103,6 +1149,57 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
       {receipt.duplicate && (
         <div className="mx-4 mt-3 px-3 py-2 bg-amber-50 border border-amber-300 rounded text-xs text-amber-700 font-mono flex items-center gap-2">
           <Icon icon="mdi:alert-outline" className="w-3.5 h-3.5 shrink-0" /> {t("preview.duplicate_banner")}
+        </div>
+      )}
+      {(receipt.validation_warnings?.length ?? 0) > 0 && !warnDismissed && (
+        <div className="mx-4 mt-3 px-3 py-2 bg-red-50 border border-red-300 rounded text-xs text-red-700 font-mono flex flex-col gap-1">
+          {!warnConfirmPending ? (
+            <div className="flex items-center gap-1.5">
+              <Icon icon="mdi:alert-circle-outline" className="w-3.5 h-3.5 shrink-0" />
+              <span className="font-bold flex-1">{t("preview.validation_warning_title")}</span>
+              <button
+                onClick={() => setWarnConfirmPending(true)}
+                className="ml-auto text-red-400 hover:text-red-700 focus:outline-none"
+                aria-label="Dismiss"
+              >
+                <Icon icon="mdi:close" className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="flex-1 font-bold">{t("preview.warn_suppress_confirm")}</span>
+              <button
+                onClick={async () => {
+                  try {
+                    const res = await fetch(`${apiBase}/receipts/${receipt.id}${qs(dbPath)}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ validation_warnings: [] }),
+                    });
+                    if (res.ok) {
+                      const updated = await res.json();
+                      onSaved?.(updated);
+                    }
+                  } finally {
+                    setWarnDismissed(true);
+                    setWarnConfirmPending(false);
+                  }
+                }}
+                className="px-2 py-0.5 bg-red-600 text-white rounded font-bold hover:bg-red-700 focus:outline-none shrink-0"
+              >
+                {t("preview.warn_suppress_yes")}
+              </button>
+              <button
+                onClick={() => { setWarnDismissed(true); setWarnConfirmPending(false); }}
+                className="px-2 py-0.5 border border-red-300 text-red-500 rounded hover:text-red-700 hover:border-red-500 focus:outline-none shrink-0"
+              >
+                {t("preview.warn_suppress_no")}
+              </button>
+            </div>
+          )}
+          {receipt.validation_warnings!.map((w, i) => (
+            <div key={i} className="pl-5 text-red-600">{w}</div>
+          ))}
         </div>
       )}
       {savedVisible && !editing && (

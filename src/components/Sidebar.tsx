@@ -71,6 +71,7 @@ export type Receipt = {
   pdf_url:        string | null;
   duplicate?:     boolean;
   message?:       string;
+  validation_warnings?: string[];
 };
 
 // ---------------------------------------------------------------------------
