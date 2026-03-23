@@ -853,11 +853,10 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
   const pdfUrl = receipt.pdf_url ? `${apiBase}${receipt.pdf_url}${qs(dbPath)}` : null;
   const receiptSplits = ((receipt as Receipt & { vat_splits?: { position: number; vat_rate: number | null; vat_amount: number | null; net_amount: number | null }[] }).vat_splits ?? []);
   const cpVerifiedFromReceipt = !!(receipt.counterparty as (typeof receipt.counterparty & { verified?: boolean }))?.verified;
-  // isVerified is ONLY true when the user has explicitly confirmed it this session.
-  // cpVerifiedFromReceipt (DB state) is shown as a separate read-only badge — it must
-  // never auto-check the box, because the backend can auto-link new receipts to an already-
-  // verified counterparty without any user confirmation.
-  const isVerified = localVerified === true;
+  // isVerified reflects the DB counterparty state unless the user has overridden it
+  // this session. VAT-ID-based merging was removed so this is safe — verified state
+  // only comes from actual user confirmation on the correct counterparty row.
+  const isVerified = localVerified !== null ? localVerified : cpVerifiedFromReceipt;
   const cpId = receipt.counterparty?.id ?? null;
   // Receipt currency (default EUR)
   const rcCurrency = receipt.currency ?? "EUR";
@@ -1059,21 +1058,8 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
   };
 
   // ── Verified checkbox widget (always shown) ─────────────────────────────
-  // RULE: the checkbox is only checked when the user explicitly confirmed it
-  // (localVerified === true).  If the DB counterparty is already marked
-  // verified but the user has NOT confirmed it in this session, we show a
-  // read-only amber badge instead — never auto-setting the tick.
   const verifiedWidget = (
     <div className="flex items-center gap-1.5">
-      {/* Read-only badge: counterparty is verified in DB but user hasn't ticked it yet */}
-      {cpVerifiedFromReceipt && !isVerified && !verifyConfirm && (
-        <Tip label={t("preview.verified_db_hint", { defaultValue: "Counterparty is marked verified – click ✓ to confirm for this receipt" })} pos="bottom-right">
-          <span className="flex items-center gap-1 bg-amber-200 text-black/60 text-[9px] font-black px-1.5 py-0.5 rounded uppercase leading-none select-none">
-            <Icon icon="mdi:check-circle-outline" className="w-2.5 h-2.5" />
-            {t("preview.verified")}
-          </span>
-        </Tip>
-      )}
       {verifyConfirm ? (
         <span className="flex items-center gap-1.5 text-[10px] font-bold text-black">
           {t("preview.confirm_verified")}
