@@ -585,8 +585,8 @@ function CounterpartiesExplorer({ apiBase, dbPath, onClose, onSelect }: {
   );
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 flex items-stretch justify-end">
-      <div className="w-full max-w-3xl bg-white flex flex-col shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-stretch justify-end pointer-events-none">
+      <div className="w-full max-w-3xl bg-white flex flex-col shadow-2xl pointer-events-auto">
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b-2 border-black shrink-0">
@@ -1585,15 +1585,13 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
                 </Tip>
               </div>
             </div>
-            {cpExplorerOpen
-              ? <div className="flex-1 bg-black" />
-              : isPdf(pdfUrl)
-                ? <iframe src={pdfUrl} className="flex-1" title="Receipt PDF fullscreen" />
-                : (
-                  <div className="flex-1 min-h-0 flex items-center justify-center bg-black overflow-hidden">
-                    <img src={pdfUrl} className="max-h-full max-w-full object-contain" alt="Receipt fullscreen" />
-                  </div>
-                )
+            {isPdf(pdfUrl)
+              ? <iframe src={pdfUrl} className="flex-1" title="Receipt PDF fullscreen" />
+              : (
+                <div className="flex-1 min-h-0 flex items-center justify-center bg-black overflow-hidden">
+                  <img src={pdfUrl} className="max-h-full max-w-full object-contain" alt="Receipt fullscreen" />
+                </div>
+              )
             }
           </div>
           {/* Data panel — same as normal, full editing available */}
