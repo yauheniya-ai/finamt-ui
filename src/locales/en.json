@@ -5,6 +5,7 @@
   "sidebar": {
     "upload_receipt": "Upload Receipt",
     "upload_invoice": "Upload Invoice",
+    "cancel_upload": "Cancel upload",
     "processing": "Processing…",
     "expense": "Expense",
     "revenue": "Revenue",
@@ -144,6 +145,7 @@
     "taxpayer_tax_number": "Tax Number (Steuernr.)",
     "taxpayer_address": "Address",
     "taxpayer_street": "Street & No.",
+    "taxpayer_address_supplement": "Address Supplement",
     "taxpayer_postcode": "Postcode",
     "taxpayer_city": "City",
     "taxpayer_state": "State / Region",

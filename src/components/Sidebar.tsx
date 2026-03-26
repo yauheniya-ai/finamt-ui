@@ -27,14 +27,15 @@ export type Counterparty = {
 };
 
 export type TaxpayerProfile = {
-  name:       string;
-  vat_id:     string;
-  tax_number: string;
-  street:     string;
-  postcode:   string;
-  city:       string;
-  state:      string;
-  country:    string;
+  name:               string;
+  vat_id:             string;
+  tax_number:         string;
+  street:             string;
+  address_supplement: string;
+  postcode:           string;
+  city:               string;
+  state:              string;
+  country:            string;
 };
 
 export type ReceiptItem = {
@@ -143,14 +144,15 @@ export function TaxpayerModal({ initial, onSave, onClear, onClose }: {
 }) {
   const { t } = useTranslation();
   const [form, setForm] = useState<TaxpayerProfile>({
-    name:       initial?.name       ?? "",
-    vat_id:     initial?.vat_id     ?? "",
-    tax_number: initial?.tax_number ?? "",
-    street:     initial?.street     ?? "",
-    postcode:   initial?.postcode   ?? "",
-    city:       initial?.city       ?? "",
-    state:      initial?.state      ?? "",
-    country:    initial?.country    ?? "",
+    name:               initial?.name               ?? "",
+    vat_id:             initial?.vat_id             ?? "",
+    tax_number:         initial?.tax_number         ?? "",
+    street:             initial?.street             ?? "",
+    address_supplement: initial?.address_supplement ?? "",
+    postcode:           initial?.postcode           ?? "",
+    city:               initial?.city               ?? "",
+    state:              initial?.state              ?? "",
+    country:            initial?.country            ?? "",
   });
   const set = (key: keyof TaxpayerProfile) =>
     (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -196,6 +198,13 @@ export function TaxpayerModal({ initial, onSave, onClear, onClose }: {
             onChange={set("street")}
             className="border border-black/20 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-amber-400"
             placeholder={t("sidebar.taxpayer_street")}
+          />
+          <input
+            type="text"
+            value={form.address_supplement}
+            onChange={set("address_supplement")}
+            className="border border-black/20 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-amber-400"
+            placeholder={t("sidebar.taxpayer_address_supplement")}
           />
           <div className="flex gap-1.5">
             <input
@@ -305,6 +314,7 @@ type Props = {
   onDelete:         (id: string) => void;
   uploading:        boolean;
   progressStep?:    string | null;
+  onCancelUpload?:  () => void;
   error?:           string | null;
   period:           PeriodFilter;
   onPeriodChange:   (p: PeriodFilter) => void;
@@ -484,7 +494,7 @@ function SectionDivider({ label, count, total, isRevenue, isOpen, onToggle }: { 
 // MONTHS rendered via t("sidebar.months") array
 
 export default function Sidebar({
-  receipts, selectedId, onSelect, onUpload, onDelete, uploading, progressStep, error,
+  receipts, selectedId, onSelect, onUpload, onDelete, uploading, progressStep, onCancelUpload, error,
   period, onPeriodChange, taxpayer, onEditTaxpayer,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -583,23 +593,34 @@ export default function Sidebar({
           ))}
         </div>
 
-        <button
-          onClick={() => inputRef.current?.click()}
-          disabled={uploading}
-          className="w-full flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-sm py-2 px-3 rounded border border-red-700 transition-colors"
-        >
-          {uploading ? (
-            <>
-              <IconSpinner className="w-4 h-4" />
-              {progressStep ?? "..."}
-            </>
-          ) : (
-            <>
-              <Icon icon="mdi:upload" className="w-4 h-4" />
-              {uploadType === "sale" ? t("sidebar.upload_invoice") : t("sidebar.upload_receipt")}
-            </>
+        <div className="flex gap-2">
+          <button
+            onClick={() => inputRef.current?.click()}
+            disabled={uploading}
+            className="flex-1 flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-sm py-2 px-3 rounded border border-red-700 transition-colors"
+          >
+            {uploading ? (
+              <>
+                <IconSpinner className="w-4 h-4" />
+                {progressStep ?? "..."}
+              </>
+            ) : (
+              <>
+                <Icon icon="mdi:upload" className="w-4 h-4" />
+                {uploadType === "sale" ? t("sidebar.upload_invoice") : t("sidebar.upload_receipt")}
+              </>
+            )}
+          </button>
+          {uploading && (
+            <button
+              onClick={onCancelUpload}
+              title={t("sidebar.cancel_upload")}
+              className="flex items-center justify-center px-2 py-2 rounded border border-black/20 bg-white hover:bg-red-50 text-black/50 hover:text-red-600 transition-colors"
+            >
+              <Icon icon="mdi:close" className="w-4 h-4" />
+            </button>
           )}
-        </button>
+        </div>
 
         <input
           ref={inputRef}

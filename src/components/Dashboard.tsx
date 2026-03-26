@@ -212,9 +212,9 @@ export default function Dashboard({ receipts, period, taxpayer, onEditTaxpayer }
               )}
             </p>
             <div className="flex items-baseline justify-end gap-2 mt-0.5">
-              {(taxpayer.street || taxpayer.city) && (
+              {(taxpayer.street || taxpayer.address_supplement || taxpayer.city) && (
                 <p className="text-black/50 text-[11px] font-mono">
-                  {[taxpayer.street, [taxpayer.postcode, taxpayer.city].filter(Boolean).join(" "), taxpayer.state, taxpayer.country].filter(Boolean).join(", ")}
+                  {[taxpayer.street, taxpayer.address_supplement, [taxpayer.postcode, taxpayer.city].filter(Boolean).join(" "), taxpayer.state, taxpayer.country].filter(Boolean).join(", ")}
                 </p>
               )}
               {onEditTaxpayer && (

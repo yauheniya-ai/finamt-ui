@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import Header from "./components/Header";
 import Sidebar, { type Receipt, type PeriodFilter, type TaxpayerProfile, TaxpayerModal, DEFAULT_PERIOD, filterByPeriod } from "./components/Sidebar";
 import Dashboard from "./components/Dashboard";
@@ -27,6 +27,7 @@ export default function App() {
   const [period,    setPeriod]    = useState<PeriodFilter>(DEFAULT_PERIOD);
   const [taxpayer,  setTaxpayer]  = useState<TaxpayerProfile | null>(() => loadTaxpayer(null));
   const [showTaxpayerModal, setShowTaxpayerModal] = useState(false);
+  const uploadAbortRef = useRef<AbortController | null>(null);
 
   // Reload taxpayer whenever the active DB changes
   useEffect(() => {
@@ -52,13 +53,20 @@ export default function App() {
   // Filtered view — passed to Sidebar + Dashboard
   const visibleReceipts = filterByPeriod(receipts, period);
 
+  const handleCancelUpload = useCallback(() => {
+    uploadAbortRef.current?.abort();
+  }, []);
+
   const handleUpload = useCallback(async (files: File[], type: "purchase" | "sale" = "purchase") => {
+    const abortController = new AbortController();
+    uploadAbortRef.current = abortController;
     setUploading(true);
     setProgressStep(null);
     setError(null);
     let lastReceipt: Receipt | null = null;
     const total = files.length;
     for (let i = 0; i < total; i++) {
+      if (abortController.signal.aborted) break;
       const file = files[i];
       const prefix = total > 1 ? `[${i + 1}/${total}] ` : "";
       setProgressStep(prefix + "...");
@@ -66,10 +74,10 @@ export default function App() {
         const body = new FormData();
         body.append("file", file);
         const tqs = taxpayer
-          ? `&taxpayer_name=${encodeURIComponent(taxpayer.name)}&taxpayer_vat_id=${encodeURIComponent(taxpayer.vat_id)}&taxpayer_tax_number=${encodeURIComponent(taxpayer.tax_number)}&taxpayer_street=${encodeURIComponent(taxpayer.street)}&taxpayer_postcode=${encodeURIComponent(taxpayer.postcode)}&taxpayer_city=${encodeURIComponent(taxpayer.city)}&taxpayer_state=${encodeURIComponent(taxpayer.state)}&taxpayer_country=${encodeURIComponent(taxpayer.country)}`
+          ? `&taxpayer_name=${encodeURIComponent(taxpayer.name)}&taxpayer_vat_id=${encodeURIComponent(taxpayer.vat_id)}&taxpayer_tax_number=${encodeURIComponent(taxpayer.tax_number)}&taxpayer_street=${encodeURIComponent(taxpayer.street)}&taxpayer_address_supplement=${encodeURIComponent(taxpayer.address_supplement ?? "")}&taxpayer_postcode=${encodeURIComponent(taxpayer.postcode)}&taxpayer_city=${encodeURIComponent(taxpayer.city)}&taxpayer_state=${encodeURIComponent(taxpayer.state)}&taxpayer_country=${encodeURIComponent(taxpayer.country)}`
           : "";
         const url = `${API_BASE}/receipts/upload/stream?receipt_type=${type}${activeDb ? `&db=${encodeURIComponent(activeDb)}` : ""}${tqs}`;
-        const res = await fetch(url, { method: "POST", body });
+        const res = await fetch(url, { method: "POST", body, signal: abortController.signal });
         if (!res.ok || !res.body) throw new Error((await res.json()).detail ?? "Upload failed.");
 
         const reader = res.body.getReader();
@@ -111,6 +119,7 @@ export default function App() {
           }
         }
       } catch (e: unknown) {
+        if (e instanceof Error && e.name === "AbortError") break;
         const msg = e instanceof Error ? e.message : "Upload failed.";
         setError(total > 1 ? `${file.name}: ${msg}` : msg);
         // Continue processing remaining files
@@ -174,6 +183,7 @@ export default function App() {
           onDelete={handleDelete}
           uploading={uploading}
           progressStep={progressStep}
+          onCancelUpload={handleCancelUpload}
           error={null}
           period={period}
           onPeriodChange={setPeriod}

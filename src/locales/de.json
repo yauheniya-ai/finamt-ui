@@ -5,6 +5,7 @@
   "sidebar": {
     "upload_receipt": "Beleg hochladen",
     "upload_invoice": "Rechnung hochladen",
+    "cancel_upload": "Upload abbrechen",
     "processing": "Verarbeitung…",
     "expense": "Ausgabe",
     "revenue": "Einnahmen",
@@ -144,6 +145,7 @@
     "taxpayer_tax_number": "Steuernummer",
     "taxpayer_address": "Adresse",
     "taxpayer_street": "Straße & Nr.",
+    "taxpayer_address_supplement": "Adresszusatz",
     "taxpayer_postcode": "PLZ",
     "taxpayer_city": "Ort",
     "taxpayer_state": "Bundesland",
