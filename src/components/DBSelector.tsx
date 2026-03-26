@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
+import {
+  IconClose, IconDatabase, IconDatabaseCheck, IconDatabaseOff,
+  IconChevronDown, IconDelete, IconRefresh, IconPlusCircle, IconSpinner,
+} from "../constants/icons";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -149,9 +152,9 @@ export default function DBSelector({ apiBase, activeDb, onSelect }: Props) {
         className="flex items-center gap-1.5 text-xs font-bold font-mono text-black/60 hover:text-black transition-colors border border-black/10 rounded px-2 py-1 bg-white"
         title={t("db.switch")}
       >
-        <Icon icon="mdi:database-outline" className="w-3.5 h-3.5" />
+        <IconDatabase className="w-3.5 h-3.5" />
         {label}
-        <Icon icon="mdi:chevron-down" className="w-3 h-3" />
+        <IconChevronDown className="w-3 h-3" />
       </button>
 
       {/* Modal */}
@@ -165,7 +168,7 @@ export default function DBSelector({ apiBase, activeDb, onSelect }: Props) {
                 <h2 className="text-sm font-black uppercase tracking-wider">{t("db.title")}</h2>
                 <p className="text-xs text-black/60 font-mono mt-0.5">~/.finamt/</p>
               </div>
-              <button onClick={closeModal}><Icon icon="mdi:close" className="w-5 h-5" /></button>
+              <button onClick={closeModal}><IconClose className="w-5 h-5" /></button>
             </div>
 
             {/* Body */}
@@ -173,7 +176,7 @@ export default function DBSelector({ apiBase, activeDb, onSelect }: Props) {
 
               {loading && (
                 <div className="flex items-center justify-center gap-2 py-12 text-black/40 text-sm font-mono">
-                  <Icon icon="svg-spinners:12-dots-scale-rotate" className="w-5 h-5" />
+                  <IconSpinner className="w-5 h-5" />
                   {t("db.scanning")}
                 </div>
               )}
@@ -186,7 +189,7 @@ export default function DBSelector({ apiBase, activeDb, onSelect }: Props) {
 
               {!loading && !fetchErr && projects.length === 0 && (
                 <div className="flex flex-col items-center gap-3 py-12 text-center">
-                  <Icon icon="mdi:database-off-outline" className="w-10 h-10 text-black/20" />
+                  <IconDatabaseOff className="w-10 h-10 text-black/20" />
                   <p className="text-black/40 text-xs font-mono">{t("db.no_projects")}</p>
                 </div>
               )}
@@ -204,10 +207,9 @@ export default function DBSelector({ apiBase, activeDb, onSelect }: Props) {
                         onClick={() => { onSelect(proj); setOpen(false); }}
                         className="flex items-center gap-3 flex-1 min-w-0 text-left"
                       >
-                        <Icon
-                          icon={isActive ? "mdi:database-check" : "mdi:database-outline"}
-                          className={`w-5 h-5 shrink-0 ${isActive ? "text-amber-600" : "text-black/30"}`}
-                        />
+                        {isActive
+                          ? <IconDatabaseCheck className="w-5 h-5 shrink-0 text-amber-600" />
+                          : <IconDatabase className="w-5 h-5 shrink-0 text-black/30" />}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="text-sm font-black text-black">{proj.name}</span>
@@ -244,7 +246,7 @@ export default function DBSelector({ apiBase, activeDb, onSelect }: Props) {
                           className="shrink-0 text-black/20 hover:text-red-500 transition-colors ml-1"
                           title={t("db.delete")}
                         >
-                          <Icon icon="mdi:trash-can-outline" className="w-4 h-4" />
+                          <IconDelete className="w-4 h-4" />
                         </button>
                       )}
                     </div>
@@ -299,7 +301,7 @@ export default function DBSelector({ apiBase, activeDb, onSelect }: Props) {
                       className="shrink-0 text-xs font-bold bg-black text-white px-3 py-1.5 rounded hover:bg-black/80 disabled:opacity-40 transition-colors flex items-center gap-1"
                     >
                       {creating
-                        ? <><Icon icon="svg-spinners:12-dots-scale-rotate" className="w-3.5 h-3.5" /> {t("db.creating")}</>
+                        ? <><IconSpinner className="w-3.5 h-3.5" /> {t("db.creating")}</>
                         : t("db.create")
                       }
                     </button>
@@ -307,7 +309,7 @@ export default function DBSelector({ apiBase, activeDb, onSelect }: Props) {
                       onClick={() => { setAdding(false); setNewName(""); setNameErr(null); }}
                       className="shrink-0 text-black/30 hover:text-black transition-colors"
                     >
-                      <Icon icon="mdi:close" className="w-4 h-4" />
+                      <IconClose className="w-4 h-4" />
                     </button>
                   </div>
                   {nameErr && (
@@ -327,7 +329,7 @@ export default function DBSelector({ apiBase, activeDb, onSelect }: Props) {
                   onClick={load}
                   className="text-xs text-black/40 hover:text-black font-mono flex items-center gap-1 transition-colors"
                 >
-                  <Icon icon="mdi:refresh" className="w-3.5 h-3.5" />
+                  <IconRefresh className="w-3.5 h-3.5" />
                   {t("db.refresh")}
                 </button>
                 {!adding && (
@@ -335,7 +337,7 @@ export default function DBSelector({ apiBase, activeDb, onSelect }: Props) {
                     onClick={() => { setAdding(true); setConfirmDelete(null); }}
                     className="text-xs font-bold text-black/50 hover:text-black flex items-center gap-1.5 transition-colors"
                   >
-                    <Icon icon="mdi:plus-circle-outline" className="w-3.5 h-3.5" />
+                    <IconPlusCircle className="w-3.5 h-3.5" />
                     {t("db.add_project")}
                   </button>
                 )}

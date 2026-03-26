@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Icon } from "@iconify/react";
+import { IconChevronDown, IconClose, IconDelete, IconPlusCircle, IconSpinner } from "../constants/icons";
 import type { Receipt, ReceiptItem } from "./Sidebar";
 import { fmt, CATEGORY_META } from "./Sidebar";
 import type { CategoryMeta } from "./Sidebar";
@@ -81,7 +82,7 @@ function CategorySelect({ value, onChange }: { value: string; onChange: (v: stri
           <span className="flex-1 text-left truncate">
             {t(`sidebar.categories.${value}`, { defaultValue: meta?.label ?? value })}
           </span>
-          <Icon icon="mdi:chevron-down" className={`shrink-0 text-base transition-transform ${open ? "rotate-180" : ""}`} />
+          <IconChevronDown className={`shrink-0 text-base transition-transform ${open ? "rotate-180" : ""}`} />
         </button>
 
         {/* Dropdown */}
@@ -317,7 +318,7 @@ function ItemRow({ item, editing, draft, onChange, onDelete, index, currency = "
           placeholder={t("preview.item_placeholder_description")}
           className="flex-1 text-xs font-semibold text-black bg-white border border-amber-300 rounded px-2 py-1 outline-none focus:border-amber-500" />
         <button onClick={onDelete} className="shrink-0 text-black/30 hover:text-red-500 transition-colors">
-          <Icon icon="mdi:trash-can-outline" className="w-3.5 h-3.5" />
+          <IconDelete className="w-3.5 h-3.5" />
         </button>
       </div>
       <div className="grid grid-cols-3 gap-1 pl-6">
@@ -385,7 +386,7 @@ function VatSplitRow({ split, editing, draft, onChange, onDelete }: {
           placeholder="0.00" className="w-full text-xs font-mono text-black bg-white border border-amber-300 rounded px-1.5 py-0.5 outline-none focus:border-amber-500" />
       </label>
       <button onClick={onDelete} className="shrink-0 text-black/30 hover:text-red-500 transition-colors mt-3.5">
-        <Icon icon="mdi:trash-can-outline" className="w-3.5 h-3.5" />
+        <IconDelete className="w-3.5 h-3.5" />
       </button>
     </div>
   );
@@ -592,7 +593,7 @@ function CounterpartiesExplorer({ apiBase, dbPath, onClose, onSelect }: {
         <div className="flex items-center justify-between px-5 py-3 border-b-2 border-black shrink-0">
           <h2 className="text-sm font-black uppercase tracking-wider">{t("preview.cp_explorer_title")}</h2>
           <button onClick={onClose} className="text-black/40 hover:text-black transition-colors p-0.5 rounded">
-            <Icon icon="mdi:close" className="w-5 h-5" />
+            <IconClose className="w-5 h-5" />
           </button>
         </div>
 
@@ -689,7 +690,7 @@ function CounterpartiesExplorer({ apiBase, dbPath, onClose, onSelect }: {
                         </button>
                         <button onClick={() => { setDeleteId(deleteId === cp.id ? null : cp.id); setEditId(null); setEditDraft(null); }}
                           className="text-black/30 hover:text-red-500 transition-colors shrink-0 p-0.5">
-                          <Icon icon="mdi:trash-can-outline" className="w-3.5 h-3.5" />
+                          <IconDelete className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
@@ -727,7 +728,7 @@ function CounterpartiesExplorer({ apiBase, dbPath, onClose, onSelect }: {
                         <div className="flex gap-2">
                           <button onClick={() => handleSave(cp.id)} disabled={saving}
                             className="text-[11px] font-black bg-black text-white px-3 py-1.5 rounded hover:bg-black/80 disabled:opacity-40 transition-colors flex items-center gap-1.5">
-                            {saving && <Icon icon="svg-spinners:12-dots-scale-rotate" className="w-3 h-3" />}
+                            {saving && <IconSpinner className="w-3 h-3" />}
                             {t("preview.cp_save")}
                           </button>
                           <button onClick={() => { setEditId(null); setEditDraft(null); }}
@@ -1148,7 +1149,7 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
                 className="ml-auto text-red-400 hover:text-red-700 focus:outline-none"
                 aria-label="Dismiss"
               >
-                <Icon icon="mdi:close" className="w-3.5 h-3.5" />
+                <IconClose className="w-3.5 h-3.5" />
               </button>
             </div>
           ) : (
@@ -1266,7 +1267,7 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
                     />
                     <button onClick={handleReassign} disabled={reassigning || !reassignName.trim()}
                       className="self-start text-[11px] font-black bg-black text-white px-3 py-1 rounded hover:bg-black/80 disabled:opacity-40 transition-colors flex items-center gap-1.5">
-                      {reassigning && <Icon icon="svg-spinners:12-dots-scale-rotate" className="w-3 h-3" />}
+                      {reassigning && <IconSpinner className="w-3 h-3" />}
                       {t("preview.cp_reassign_btn")}
                     </button>
                   </div>
@@ -1411,7 +1412,7 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
               ))}
               <div className="py-1.5">
                 <button onClick={addVatSplit} className="text-[10px] font-bold text-red-500 hover:text-red-700 flex items-center gap-1 transition-colors">
-                  <Icon icon="mdi:plus-circle-outline" className="w-3.5 h-3.5" /> {t("preview.add_vat_row")}
+                  <IconPlusCircle className="w-3.5 h-3.5" /> {t("preview.add_vat_row")}
                 </button>
               </div>
             </>)}
@@ -1503,7 +1504,7 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
               </h3>
               {editing && (
                 <button onClick={addItem} className="text-[10px] font-bold text-red-500 hover:text-red-700 flex items-center gap-1 transition-colors">
-                  <Icon icon="mdi:plus-circle-outline" className="w-3.5 h-3.5" /> {t("preview.add_item")}
+                  <IconPlusCircle className="w-3.5 h-3.5" /> {t("preview.add_item")}
                 </button>
               )}
             </div>
@@ -1552,7 +1553,7 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
           <button onClick={handleSave} disabled={saving}
             className="w-full bg-red-500 hover:bg-red-600 disabled:opacity-40 text-white font-bold text-sm py-2 rounded border border-red-700 transition-colors flex items-center justify-center gap-2">
             {saving
-              ? <><Icon icon="svg-spinners:12-dots-scale-rotate" className="w-4 h-4" /> {t("preview.btn_saving")}</>
+              ? <><IconSpinner className="w-4 h-4" /> {t("preview.btn_saving")}</>
               : <><Icon icon="mdi:content-save-outline" className="w-4 h-4" /> {t("preview.btn_save")}</>
             }
           </button>

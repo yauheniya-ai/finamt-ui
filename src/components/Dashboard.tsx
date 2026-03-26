@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Icon } from "@iconify/react";
+import { IconChevronDown } from "../constants/icons";
 import { useTranslation } from "react-i18next";
 import type { Receipt, PeriodFilter, TaxpayerProfile } from "./Sidebar";
 import { CATEGORY_META, fmt, displayName } from "./Sidebar";
@@ -88,8 +89,7 @@ function CategoryChart({ title, totals, receipts }: {
                   <span className="text-xs text-black font-black font-mono w-24 text-right shrink-0">
                     {fmt(total)}
                   </span>
-                  <Icon
-                    icon="mdi:chevron-down"
+                  <IconChevronDown
                     className={`w-3.5 h-3.5 text-black/30 shrink-0 transition-transform ${
                       isOpen ? "rotate-180" : ""
                     }`}

@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import i18n from "../i18n";
 import { Icon } from "@iconify/react";
 import { CATEGORY_META } from "../constants";
+import { IconChevronDown, IconDelete, IconSpinner } from "../constants/icons";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -365,9 +366,8 @@ function CategoryGroup({
         </span>
         <span className="flex items-center gap-1.5">
           <span className="text-black text-xs font-mono font-black">{fmt(catTotal)}</span>
-          <Icon
-            icon="mdi:chevron-right"
-            className={`w-3.5 h-3.5 text-black/30 transition-transform ${isOpen ? "rotate-90" : ""}`}
+          <IconChevronDown
+            className={`w-3.5 h-3.5 text-black/30 transition-transform ${isOpen ? "" : "-rotate-90"}`}
           />
         </span>
       </button>
@@ -394,8 +394,7 @@ function CategoryGroup({
               </span>
               <span className="flex items-center gap-1 shrink-0">
                 <span className="text-xs font-bold font-mono text-black">{fmt(supplierTotal)}</span>
-                <Icon
-                  icon="mdi:chevron-down"
+                <IconChevronDown
                   className={`w-3 h-3 text-black/30 transition-transform ${isSupplierOpen ? "rotate-180" : ""}`}
                 />
               </span>
@@ -431,7 +430,7 @@ function CategoryGroup({
                     className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-all"
                     title="Delete"
                   >
-                    <Icon icon="mdi:close" className="w-3.5 h-3.5" />
+                    <IconDelete className="w-3.5 h-3.5" />
                   </button>
 
                   {confirmingId === r.id && (
@@ -470,8 +469,7 @@ function SectionDivider({ label, count, total, isRevenue, isOpen, onToggle }: { 
       </span>
       <span className="flex items-center gap-1.5">
         <span className="text-xs font-mono font-black">{fmt(total)}</span>
-        <Icon
-          icon="mdi:chevron-down"
+        <IconChevronDown
           className={`w-3.5 h-3.5 text-black/30 transition-transform ${isOpen ? "" : "-rotate-90"}`}
         />
       </span>
@@ -592,7 +590,7 @@ export default function Sidebar({
         >
           {uploading ? (
             <>
-              <Icon icon="svg-spinners:12-dots-scale-rotate" className="w-4 h-4" />
+              <IconSpinner className="w-4 h-4" />
               {progressStep ?? "..."}
             </>
           ) : (
