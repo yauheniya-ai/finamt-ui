@@ -6,6 +6,7 @@ import { fmt, CATEGORY_META } from "./Sidebar";
 import type { CategoryMeta } from "./Sidebar";
 import { CATEGORY_SUBCATEGORIES } from "../constants";
 import { useTranslation } from "react-i18next";
+import i18n from "../i18n";
 
 type Props = {
   receipt:  Receipt | null;
@@ -21,6 +22,16 @@ const qs = (dbPath?: string | null) =>
  *  separator (German locale: "195,66" → 195.66).  Falls back to NaN just
  *  like the native parseFloat so callers can check with isNaN(). */
 const parseDecimal = (v: string) => parseFloat(v.replace(",", "."));
+
+/** Format a number for a plain text input using the current locale's decimal
+ *  separator (comma for German, dot for English). No currency symbol, no
+ *  thousands separator. Returns "" for null/undefined. */
+const numToInputStr = (n: number | null | undefined): string => {
+  if (n == null) return "";
+  // Use up to 5 decimal places and strip trailing zeros
+  const dot = n.toFixed(5).replace(/\.?0+$/, "");
+  return i18n.language === "de" ? dot.replace(".", ",") : dot;
+};
 
 // ---------------------------------------------------------------------------
 // Tooltip
@@ -224,9 +235,11 @@ function currSymbol(currency: string): string {
 function CurrencyConverter({
   currency,
   onRateChange,
+  apiBase,
 }: {
   currency: string;
   onRateChange: (rate: number | null) => void;
+  apiBase: string;
 }) {
   const { t } = useTranslation();
   const [rate,       setRate]       = useState<number | null>(null);
@@ -234,19 +247,38 @@ function CurrencyConverter({
   const [customRate, setCustomRate] = useState("");
   const [loading,    setLoading]    = useState(false);
   const [error,      setError]      = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
-  // Fetch live rate whenever the currency changes
+  // Reset the manual override whenever the base currency changes (not on retry)
+  useEffect(() => { setCustomRate(""); }, [currency]);
+
+  // Fetch live rate via local backend proxy (avoids browser CORS restrictions)
   useEffect(() => {
-    setRate(null); setRateDate(null); setCustomRate(""); setError(null);
+    setRate(null); setRateDate(null); setError(null);
     onRateChange(null);
     if (!currency || currency === "EUR") return;
     setLoading(true);
-    fetch(`https://api.frankfurter.app/latest?from=${currency}&to=EUR`)
-      .then((r) => r.json())
-      .then((d) => { setRate(d.rates?.EUR ?? null); setRateDate(d.date ?? null); })
-      .catch(() => setError("Rate unavailable"))
+    fetch(`${apiBase}/fx-rate?from=${encodeURIComponent(currency)}&to=EUR`)
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((d) => {
+        const fetched: number | null = d.rate ?? null;
+        if (fetched == null) throw new Error("no_rate");
+        setRate(fetched);
+        setRateDate(d.date ?? null);
+      })
+      .catch((e: unknown) => {
+        const msg = e instanceof Error ? e.message : "";
+        setError(
+          msg === "no_rate"
+            ? t("preview.rate_no_data", { defaultValue: "No rate data returned for this currency" })
+            : t("preview.rate_fetch_failed", { defaultValue: "Could not fetch live rate" }),
+        );
+      })
       .finally(() => setLoading(false));
-  }, [currency]);
+  }, [currency, retryCount]);  // retryCount lets the user trigger a re-fetch
 
   // Report effective rate (custom overrides fetched) back to parent
   const effectiveRate = customRate ? parseDecimal(customRate) : rate;
@@ -266,7 +298,18 @@ function CurrencyConverter({
           </span>
         )}
       </div>
-      {error && <p className="text-red-500 text-[10px] mb-1">{error}</p>}
+      {error && (
+        <div className="flex items-center gap-1.5 mb-1 text-red-500 text-[10px]">
+          <Icon icon="mdi:wifi-off" className="w-3 h-3 shrink-0" />
+          <span className="flex-1">{error}</span>
+          <button
+            onClick={() => { setCustomRate(""); setRetryCount((n) => n + 1); }}
+            className="ml-1 shrink-0 underline hover:text-red-700"
+          >
+            {t("preview.rate_retry", { defaultValue: "Retry" })}
+          </button>
+        </div>
+      )}
       <div className="flex items-center gap-2">
         <span className="text-black/50 text-[10px] shrink-0">
           {t("preview.rate_label", { defaultValue: "Rate" })}
@@ -275,7 +318,7 @@ function CurrencyConverter({
           type="number" step="0.00001" min="0"
           value={customRate}
           onChange={(e) => setCustomRate(e.target.value)}
-          placeholder={rate != null ? rate.toFixed(5) : ""}
+          placeholder={rate != null ? rate.toFixed(5) : t("preview.rate_manual_placeholder", { defaultValue: "enter manually" })}
           className="w-28 text-xs font-mono bg-white border border-amber-300 rounded px-2 py-0.5 outline-none focus:border-amber-500"
         />
         {effectiveRate != null && (
@@ -889,9 +932,9 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
       receipt_number:        receipt.receipt_number  ?? "",
       receipt_date:          receipt.receipt_date    ?? "",
       receipt_type:          receipt.receipt_type    ?? "purchase",
-      total_amount:          receipt.total_amount?.toString()   ?? "",
-      vat_percentage:        receipt.vat_percentage?.toString() ?? "",
-      vat_amount:            receipt.vat_amount?.toString()     ?? "",
+      total_amount:          numToInputStr(receipt.total_amount),
+      vat_percentage:        numToInputStr(receipt.vat_percentage),
+      vat_amount:            numToInputStr(receipt.vat_amount),
       category:              receipt.category ?? "",
       subcategory:           receipt.subcategory ?? "",
       currency:              receipt.currency ?? "EUR",
@@ -901,9 +944,9 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
       (receipt.items ?? []).map((item, i) => ({
         position:    item.position ?? i + 1,
         description: item.description  ?? "",
-        vat_rate:    item.vat_rate?.toString()    ?? "",
-        vat_amount:  item.vat_amount?.toString()  ?? "",
-        total_price: item.total_price?.toString() ?? "",
+        vat_rate:    numToInputStr(item.vat_rate),
+        vat_amount:  numToInputStr(item.vat_amount),
+        total_price: numToInputStr(item.total_price),
         category:    item.category ?? "other",
       }))
     );
@@ -911,9 +954,9 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
       setSplitVat(true);
       setVatSplitDrafts(receiptSplits.map((s, i) => ({
         position: s.position ?? i + 1,
-        vat_rate: s.vat_rate?.toString() ?? "",
-        vat_amount: s.vat_amount?.toString() ?? "",
-        net_amount: s.net_amount?.toString() ?? "",
+        vat_rate:   numToInputStr(s.vat_rate),
+        vat_amount: numToInputStr(s.vat_amount),
+        net_amount: numToInputStr(s.net_amount),
       })));
     } else {
       setSplitVat(false); setVatSplitDrafts([]);
@@ -1204,6 +1247,19 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
           <Icon icon="mdi:alert-circle-outline" className="w-3.5 h-3.5 shrink-0" /> {saveErr}
         </div>
       )}
+      {/* Foreign-currency rate missing: tax reports will be wrong */}
+      {!editing && rcCurrency !== "EUR" && convRate == null && (
+        <div className="mx-4 mt-3 px-3 py-2 bg-orange-50 border border-orange-400 rounded text-xs text-orange-800 font-mono flex items-start gap-2">
+          <Icon icon="mdi:alert" className="w-3.5 h-3.5 shrink-0 text-orange-500 mt-0.5" />
+          <span className="leading-snug">
+            <span className="font-black">{rcCurrency} → EUR: </span>
+            {t("preview.no_rate_banner", {
+              currency: rcCurrency,
+              defaultValue: `No exchange rate. EÜR/UStVA reports will treat ${rcCurrency} amounts as EUR — results will be incorrect. Scroll to the amounts section and enter the rate manually.`,
+            })}
+          </span>
+        </div>
+      )}
 
       {/* PDF thumbnail — hidden in fullscreen (PDF is full-width on left) */}
       {!pdfOpen && pdfUrl && (
@@ -1381,7 +1437,19 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
               )}
             </div>
             {!editing && (
-              <CurrencyConverter currency={rcCurrency} onRateChange={setConvRate} />
+              <CurrencyConverter currency={rcCurrency} onRateChange={setConvRate} apiBase={apiBase} />
+            )}
+            {/* ⚠ Warn when a non-EUR receipt has no resolved exchange rate */}
+            {!editing && rcCurrency !== "EUR" && convRate == null && (
+              <div className="-mx-3 px-3 py-2 border-b border-orange-300 bg-orange-50 flex items-start gap-2">
+                <Icon icon="mdi:alert" className="w-3.5 h-3.5 shrink-0 text-orange-500 mt-0.5" />
+                <span className="text-[10px] font-bold text-orange-700 leading-snug">
+                  {t("preview.no_rate_warning", {
+                    currency: rcCurrency,
+                    defaultValue: `No ${rcCurrency} → EUR rate. Tax reports (EÜR/UStVA) will use the raw ${rcCurrency} amounts as if they were EUR — figures will be wrong. Enter a rate above.`,
+                  })}
+                </span>
+              </div>
             )}
             {editing ? (
               <div className="py-2 border-b border-black/10 flex items-center justify-between">
