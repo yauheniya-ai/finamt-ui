@@ -17,6 +17,11 @@ type Props = {
 const qs = (dbPath?: string | null) =>
   dbPath ? `?db=${encodeURIComponent(dbPath)}` : "";
 
+/** Parse a user-typed decimal string that may use a comma as the decimal
+ *  separator (German locale: "195,66" → 195.66).  Falls back to NaN just
+ *  like the native parseFloat so callers can check with isNaN(). */
+const parseDecimal = (v: string) => parseFloat(v.replace(",", "."));
+
 // ---------------------------------------------------------------------------
 // Tooltip
 // ---------------------------------------------------------------------------
@@ -244,7 +249,7 @@ function CurrencyConverter({
   }, [currency]);
 
   // Report effective rate (custom overrides fetched) back to parent
-  const effectiveRate = customRate ? parseFloat(customRate) : rate;
+  const effectiveRate = customRate ? parseDecimal(customRate) : rate;
   useEffect(() => { onRateChange(effectiveRate ?? null); }, [effectiveRate]);
 
   if (currency === "EUR") return null;
@@ -1009,10 +1014,10 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
       if (draft.subcategory === "") payload["subcategory"] = null;
       for (const [k, v] of [
         ["total_amount", draft.total_amount], ["vat_percentage", draft.vat_percentage], ["vat_amount", draft.vat_amount],
-      ] as [string, string][]) { if (v) payload[k] = parseFloat(v); }
+      ] as [string, string][]) { if (v) payload[k] = parseDecimal(v); }
       // private_use_share: store as 0–1 decimal (draft holds 0–100 percent)
       if (draft.receipt_type === "purchase") {
-        const pus = parseFloat(draft.private_use_share);
+        const pus = parseDecimal(draft.private_use_share);
         payload.private_use_share = isNaN(pus) ? 0 : Math.max(0, Math.min(1, pus / 100));
       } else {
         payload.private_use_share = 0;
@@ -1030,17 +1035,17 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
       if (Object.keys(addr).length) payload["address"] = addr;
       payload["items"] = itemDrafts.map((d) => ({
         position: d.position, description: d.description || null,
-        vat_rate: d.vat_rate ? parseFloat(d.vat_rate) : null,
-        vat_amount: d.vat_amount ? parseFloat(d.vat_amount) : null,
-        total_price: d.total_price ? parseFloat(d.total_price) : null,
+        vat_rate: d.vat_rate ? parseDecimal(d.vat_rate) : null,
+        vat_amount: d.vat_amount ? parseDecimal(d.vat_amount) : null,
+        total_price: d.total_price ? parseDecimal(d.total_price) : null,
         category: d.category || "other",
       }));
       payload["vat_splits"] = splitVat
         ? vatSplitDrafts.map((s) => ({
             position: s.position,
-            vat_rate: s.vat_rate ? parseFloat(s.vat_rate) : null,
-            vat_amount: s.vat_amount ? parseFloat(s.vat_amount) : null,
-            net_amount: s.net_amount ? parseFloat(s.net_amount) : null,
+            vat_rate: s.vat_rate ? parseDecimal(s.vat_rate) : null,
+            vat_amount: s.vat_amount ? parseDecimal(s.vat_amount) : null,
+            net_amount: s.net_amount ? parseDecimal(s.net_amount) : null,
           }))
         : [];
 
@@ -1421,7 +1426,12 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
                 value={receipt.vat_percentage != null ? `${receipt.vat_percentage} %` : null}
                 editing={editing} inputValue={draft.vat_percentage}
                 onInput={(v) => setDraft((d) => ({ ...d, vat_percentage: v }))} />
-              <FieldRow label={t("preview.field_vat_amt")} value={cvt(receipt.vat_amount)}
+              <FieldRow label={t("preview.field_vat_amt")}
+                value={cvt(
+                  receipt.total_amount != null && receipt.net_amount != null
+                    ? receipt.total_amount - receipt.net_amount   // MWST = BRUTTO − NETTO (correct formula)
+                    : receipt.vat_amount
+                )}
                 editing={editing} inputValue={draft.vat_amount}
                 onInput={(v) => setDraft((d) => ({ ...d, vat_amount: v }))} />
             </>)}
@@ -1459,14 +1469,17 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
                       <span className="text-xs text-black/50 font-mono">%</span>
                     </div>
                   </div>
-                  {parseFloat(draft.private_use_share) > 0 && (() => {
-                    const gross = parseFloat(draft.total_amount) || 0;
-                    const vat   = parseFloat(draft.vat_amount)   || 0;
-                    const biz   = (100 - parseFloat(draft.private_use_share)) / 100;
+                  {parseDecimal(draft.private_use_share) > 0 && (() => {
+                    const gross = parseDecimal(draft.total_amount) || 0;
+                    const rate  = parseDecimal(draft.vat_percentage);
+                    // Correct: NETTO = BRUTTO ÷ (1 + MwSt./100) when rate is known
+                    const net   = rate > 0 ? gross / (1 + rate / 100) : gross - (parseDecimal(draft.vat_amount) || 0);
+                    const vat   = gross - net;
+                    const biz   = (100 - parseDecimal(draft.private_use_share)) / 100;
                     const sym   = currSymbol(draft.currency || "EUR");
                     return (
                       <div className="text-[10px] font-mono text-black/40 flex gap-3">
-                        <span>{t("preview.field_business_net")}: {sym} {((gross - vat) * biz).toFixed(2)}</span>
+                        <span>{t("preview.field_business_net")}: {sym} {(net * biz).toFixed(2)}</span>
                         <span>{t("preview.field_business_vat")}: {sym} {(vat * biz).toFixed(2)}</span>
                       </div>
                     );
