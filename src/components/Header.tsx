@@ -1,26 +1,15 @@
 import { useState } from "react";
-import { useTranslation } from "react-i18next";
-import DBSelector, { type DBInfo } from "./DBSelector";
 
-const INSTALL_CMD = "pip install finamt";
 
-type Props = {
-  apiBase:          string;
-  activeDb:         string | null;
-  onDbSelect:       (db: DBInfo | null) => void;
-  onLanguageChange?: (lang: "de" | "en") => void;
-};
+const INSTALL_CMD = "pip install audia";
 
-export default function Header({ apiBase, activeDb, onDbSelect, onLanguageChange }: Props) {
-  const { t, i18n } = useTranslation();
-  const isEN = i18n.language === "en";
+
+
+export default function Header() {
+
   const [copied, setCopied] = useState(false);
 
-  const toggle = () => {
-    const next = isEN ? "de" : "en";
-    i18n.changeLanguage(next);
-    onLanguageChange?.(next);
-  };
+
 
   const copy = async () => {
     await navigator.clipboard.writeText(INSTALL_CMD);
@@ -35,11 +24,11 @@ export default function Header({ apiBase, activeDb, onDbSelect, onLanguageChange
       <div className="flex flex-col gap-1">
         <div className="flex items-baseline gap-4">
           <h1 className="relative isolate inline-block text-2xl font-black font-mono text-black
-                         before:absolute before:inset-0 before:bg-amber-400 before:-rotate-3 before:z-[-1]">
-            finamt
+                         before:absolute before:inset-0 before:bg-purple-500 before:-rotate-3 before:z-[-1]">
+            audia
           </h1>
           <span className="text-black/70 text-sm font-medium">
-            {t("header.subtitle")}
+            an agentic Python package that converts PDFs — academic papers, reports, regulations — into podcast-style audio files
           </span>
         </div>
 
@@ -67,35 +56,6 @@ export default function Header({ apiBase, activeDb, onDbSelect, onLanguageChange
         </div>
       </div>
 
-      {/* Right — DB selector + DE/EN toggle */}
-      <div className="flex items-center gap-4 shrink-0 ml-6">
-
-        <DBSelector
-          apiBase={apiBase}
-          activeDb={activeDb}
-          onSelect={onDbSelect}
-        />
-
-        {/* Divider */}
-        <div className="w-px h-5 bg-black/15" />
-
-        {/* Language toggle */}
-        <div
-          className="inline-flex items-center gap-3 cursor-pointer select-none"
-          onClick={toggle}
-        >
-          <span className={`text-sm font-black font-mono transition-opacity ${!isEN ? "opacity-100" : "opacity-30"}`}>
-            DE
-          </span>
-          <div className={`relative w-10 h-6 rounded-full transition-colors duration-200 ${isEN ? "bg-red-500" : "bg-amber-400"}`}>
-            <div className={`absolute top-[4px] left-[4px] w-4 h-4 bg-black rounded-full transition-transform duration-200 ${isEN ? "translate-x-4" : "translate-x-0"}`} />
-          </div>
-          <span className={`text-sm font-black font-mono transition-opacity ${isEN ? "opacity-100" : "opacity-30"}`}>
-            EN
-          </span>
-        </div>
-
-      </div>
     </header>
   );
 }

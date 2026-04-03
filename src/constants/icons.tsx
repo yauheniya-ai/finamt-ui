@@ -19,7 +19,6 @@ export function IconDelete(props: IconProps) {
   );
 }
 
-/** mdi:close */
 export function IconClose(props: IconProps) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" {...props}>
@@ -32,7 +31,6 @@ export function IconClose(props: IconProps) {
   );
 }
 
-/** mdi:database / mdi:database-outline */
 export function IconDatabase(props: IconProps) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" {...props}>
@@ -45,7 +43,6 @@ export function IconDatabase(props: IconProps) {
   );
 }
 
-/** mdi:database-off-outline */
 export function IconDatabaseOff(props: IconProps) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" {...props}>
@@ -58,7 +55,6 @@ export function IconDatabaseOff(props: IconProps) {
   );
 }
 
-/** mdi:database-check */
 export function IconDatabaseCheck(props: IconProps) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" {...props}>
@@ -71,7 +67,6 @@ export function IconDatabaseCheck(props: IconProps) {
   );
 }
 
-/** mdi:chevron-down */
 export function IconChevronDown(props: IconProps) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 20 20" {...props}>
@@ -84,7 +79,6 @@ export function IconChevronDown(props: IconProps) {
   );
 }
 
-/** mdi:refresh */
 export function IconRefresh(props: IconProps) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" {...props}>
@@ -97,7 +91,6 @@ export function IconRefresh(props: IconProps) {
   );
 }
 
-/** mdi:plus-circle-outline */
 export function IconPlusCircle(props: IconProps) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" {...props}>
@@ -111,7 +104,6 @@ export function IconPlusCircle(props: IconProps) {
   );
 }
 
-/** svg-spinners:12-dots-scale-rotate */
 export function IconSpinner(props: IconProps) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" {...props}>
