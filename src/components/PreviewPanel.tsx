@@ -462,6 +462,7 @@ function VerifiedPicker({ apiBase, dbPath, onSelect, onManage }: {
   const [list, setList]       = useState<VerifiedCp[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen]       = useState(false);
+  const [query, setQuery]     = useState("");
 
   useEffect(() => {
     if (!open) return;
@@ -488,7 +489,7 @@ function VerifiedPicker({ apiBase, dbPath, onSelect, onManage }: {
 
   return (
     <div className="py-2 border-b border-black/10">
-      <button onClick={() => setOpen((o) => !o)}
+      <button onClick={() => { setOpen((o) => !o); setQuery(""); }}
         className="flex items-center gap-1.5 text-[10px] font-bold text-black/60 hover:text-black uppercase tracking-wider transition-colors">
         <Icon icon="mdi:account-check-outline" className="w-3.5 h-3.5" />
         {t("preview.select_from_verified")}
@@ -503,12 +504,33 @@ function VerifiedPicker({ apiBase, dbPath, onSelect, onManage }: {
               {t("preview.manage_counterparties")}
             </button>
           )}
+          <div className="px-2 py-1.5 border-b border-black/10">
+            <input
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t("preview.search_counterparty", { defaultValue: "Search…" })}
+              className="w-full text-xs font-mono bg-white border border-black/15 rounded px-2 py-1 outline-none focus:border-amber-400 placeholder:text-black/25"
+            />
+          </div>
           {loading ? (
             <div className="px-3 py-2 text-xs text-black/30 font-mono">{t("preview.loading")}</div>
-          ) : list.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-black/30 font-mono">{t("preview.no_verified_counterparties")}</div>
-          ) : list.map((cp) => (
-            <button key={cp.id} onClick={() => { onSelect(cp); setOpen(false); }}
+          ) : list.filter((cp) => {
+              if (!query.trim()) return true;
+              const q = query.toLowerCase();
+              return (cp.name ?? "").toLowerCase().includes(q)
+                || (cp.vat_id ?? "").toLowerCase().includes(q)
+                || (cp.tax_number ?? "").toLowerCase().includes(q);
+            }).length === 0 ? (
+            <div className="px-3 py-2 text-xs text-black/30 font-mono">{list.length === 0 ? t("preview.no_verified_counterparties") : t("preview.no_results", { defaultValue: "No results" })}</div>
+          ) : list.filter((cp) => {
+              if (!query.trim()) return true;
+              const q = query.toLowerCase();
+              return (cp.name ?? "").toLowerCase().includes(q)
+                || (cp.vat_id ?? "").toLowerCase().includes(q)
+                || (cp.tax_number ?? "").toLowerCase().includes(q);
+            }).map((cp) => (
+            <button key={cp.id} onClick={() => { onSelect(cp); setOpen(false); setQuery(""); }}
               className="w-full text-left px-3 py-2 hover:bg-amber-50 border-b border-black/5 last:border-0 transition-colors">
               <div className="text-xs font-bold text-black">{cp.name ?? "—"}</div>
               <div className="text-[10px] text-black/40 font-mono">{cp.vat_id ?? cp.tax_number ?? ""}</div>
@@ -1507,7 +1529,13 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
                 editing={editing} inputValue={draft.vat_amount}
                 onInput={(v) => setDraft((d) => ({ ...d, vat_amount: v }))} />
             </>)}
-            <FieldRow label={t("preview.field_net")} value={cvt(receipt.net_amount)} />
+            <FieldRow label={t("preview.field_net")} value={cvt(
+              editing && splitVat && vatSplitDrafts.length > 0
+                ? vatSplitDrafts.reduce((sum, s) => sum + (parseDecimal(s.net_amount) || 0), 0)
+                : receiptSplits.length > 0
+                  ? receiptSplits.reduce((sum, s) => sum + (s.net_amount ?? 0), 0)
+                  : receipt.net_amount
+            )} />
 
             {/* Private Use — edit mode slider (purchases only) */}
             {editing && draft.receipt_type === "purchase" && (
