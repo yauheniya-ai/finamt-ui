@@ -8,15 +8,6 @@ import Footer from "./components/Footer";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 
-const taxpayerKey = (db: string | null) => `finamt_taxpayer:${db ?? "__default__"}`;
-
-function loadTaxpayer(db: string | null): TaxpayerProfile | null {
-  try {
-    const saved = localStorage.getItem(taxpayerKey(db));
-    return saved ? (JSON.parse(saved) as TaxpayerProfile) : null;
-  } catch { return null; }
-}
-
 export default function App() {
   const [receipts,  setReceipts]  = useState<Receipt[]>([]);
   const [selected,  setSelected]  = useState<Receipt | null>(null);
@@ -25,19 +16,31 @@ export default function App() {
   const [error,     setError]     = useState<string | null>(null);
   const [activeDb,  setActiveDb]  = useState<string | null>(null);
   const [period,    setPeriod]    = useState<PeriodFilter>(DEFAULT_PERIOD);
-  const [taxpayer,  setTaxpayer]  = useState<TaxpayerProfile | null>(() => loadTaxpayer(null));
+  const [taxpayer,  setTaxpayer]  = useState<TaxpayerProfile | null>(null);
   const [showTaxpayerModal, setShowTaxpayerModal] = useState(false);
   const uploadAbortRef = useRef<AbortController | null>(null);
 
-  // Reload taxpayer whenever the active DB changes
+  // Reload taxpayer from project DB whenever the active DB changes
   useEffect(() => {
-    setTaxpayer(loadTaxpayer(activeDb));
+    const qs = activeDb ? `?db=${encodeURIComponent(activeDb)}` : "";
+    fetch(`${API_BASE}/taxpayer${qs}`)
+      .then((r) => r.json())
+      .then((d) => setTaxpayer(d.taxpayer ?? null))
+      .catch(() => setTaxpayer(null));
   }, [activeDb]);
 
   const handleTaxpayerChange = useCallback((tp: TaxpayerProfile | null) => {
     setTaxpayer(tp);
-    if (tp) localStorage.setItem(taxpayerKey(activeDb), JSON.stringify(tp));
-    else    localStorage.removeItem(taxpayerKey(activeDb));
+    const qs = activeDb ? `?db=${encodeURIComponent(activeDb)}` : "";
+    if (tp) {
+      fetch(`${API_BASE}/taxpayer${qs}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(tp),
+      }).catch(() => {});
+    } else {
+      fetch(`${API_BASE}/taxpayer${qs}`, { method: "DELETE" }).catch(() => {});
+    }
   }, [activeDb]);
 
   const dbQs = activeDb ? `?db=${encodeURIComponent(activeDb)}` : "";
