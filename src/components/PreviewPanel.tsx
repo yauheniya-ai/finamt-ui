@@ -236,10 +236,12 @@ function CurrencyConverter({
   currency,
   onRateChange,
   apiBase,
+  receiptDate,
 }: {
   currency: string;
   onRateChange: (rate: number | null) => void;
   apiBase: string;
+  receiptDate?: string | null;
 }) {
   const { t } = useTranslation();
   const [rate,       setRate]       = useState<number | null>(null);
@@ -249,16 +251,18 @@ function CurrencyConverter({
   const [error,      setError]      = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
 
-  // Reset the manual override whenever the base currency changes (not on retry)
-  useEffect(() => { setCustomRate(""); }, [currency]);
+  // Reset the manual override whenever the base currency or receipt date changes (not on retry)
+  useEffect(() => { setCustomRate(""); }, [currency, receiptDate]);
 
-  // Fetch live rate via local backend proxy (avoids browser CORS restrictions)
+  // Fetch rate via local backend proxy (avoids browser CORS restrictions).
+  // Uses the receipt date for a historical rate when available, otherwise latest.
   useEffect(() => {
     setRate(null); setRateDate(null); setError(null);
     onRateChange(null);
     if (!currency || currency === "EUR") return;
     setLoading(true);
-    fetch(`${apiBase}/fx-rate?from=${encodeURIComponent(currency)}&to=EUR`)
+    const dateParam = receiptDate ? `&date=${encodeURIComponent(receiptDate)}` : "";
+    fetch(`${apiBase}/fx-rate?from=${encodeURIComponent(currency)}&to=EUR${dateParam}`)
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
@@ -278,7 +282,7 @@ function CurrencyConverter({
         );
       })
       .finally(() => setLoading(false));
-  }, [currency, retryCount]);  // retryCount lets the user trigger a re-fetch
+  }, [currency, receiptDate, retryCount]);  // retryCount lets the user trigger a re-fetch
 
   // Report effective rate (custom overrides fetched) back to parent
   const effectiveRate = customRate ? parseDecimal(customRate) : rate;
@@ -1437,7 +1441,7 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
               )}
             </div>
             {!editing && (
-              <CurrencyConverter currency={rcCurrency} onRateChange={setConvRate} apiBase={apiBase} />
+              <CurrencyConverter currency={rcCurrency} onRateChange={setConvRate} apiBase={apiBase} receiptDate={receipt.receipt_date ?? null} />
             )}
             {/* ⚠ Warn when a non-EUR receipt has no resolved exchange rate */}
             {!editing && rcCurrency !== "EUR" && convRate == null && (
