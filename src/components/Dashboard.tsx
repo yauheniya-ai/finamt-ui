@@ -541,6 +541,344 @@ function JahresabschlussPanel({ allReceipts, period, taxpayer, onEditTaxpayer }:
 }
 
 // ---------------------------------------------------------------------------
+// UStVA panel — collapsible
+// ---------------------------------------------------------------------------
+function UStVAPanel({ receipts }: { receipts: Receipt[] }) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+
+  const purchases   = receipts.filter((r) => r.receipt_type === "purchase");
+  const sales       = receipts.filter((r) => r.receipt_type === "sale");
+  const inputVat    = purchases.reduce((s, r) => s + (r.vat_amount ?? 0), 0);
+  const outputVat   = sales.reduce((s, r) => s + (r.vat_amount ?? 0), 0);
+  const netLiability = outputVat - inputVat;
+
+  const salesByRate = sales.reduce<Record<string, { net: number; vat: number }>>((acc, r) => {
+    if (r.vat_percentage == null) return acc;
+    const key = String(r.vat_percentage);
+    if (!acc[key]) acc[key] = { net: 0, vat: 0 };
+    const net = r.net_amount ?? ((r.total_amount ?? 0) - (r.vat_amount ?? 0));
+    acc[key].net += net;
+    acc[key].vat += r.vat_amount ?? 0;
+    return acc;
+  }, {});
+
+  return (
+    <div className="bg-white border-2 border-amber-400 rounded">
+      <button
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-amber-50 transition-colors text-left"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <div>
+          <h3 className="text-black text-sm font-black uppercase tracking-wider">{t("dashboard.vat_title")}</h3>
+          <p className="text-[10px] text-black font-mono mt-0.5">
+            {receipts.length === 1
+              ? t("dashboard.vat_doc_count", { count: receipts.length })
+              : t("dashboard.vat_doc_count_plural", { count: receipts.length })}
+          </p>
+        </div>
+        <IconChevronDown className={`w-4 h-4 text-black shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="border-t border-amber-200 p-4">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="border-b-2 border-black">
+                <th className="pb-1.5 pr-3 w-8" />
+                <th className="pb-1.5 text-left text-[10px] font-black uppercase tracking-wider text-black">
+                  {t("dashboard.vat_col_section")}
+                </th>
+                <th className="pb-1.5 text-right text-[10px] font-bold uppercase tracking-wider text-black/70 w-28 pl-6">
+                  {t("dashboard.vat_col_base")}
+                </th>
+                <th className="pb-1.5 text-right text-[10px] font-bold uppercase tracking-wider text-black/70 w-28 pl-4">
+                  {t("dashboard.vat_col_tax")}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colSpan={4} className="pt-3 pb-1">
+                <span className="text-[10px] font-black uppercase tracking-wider text-black">
+                  {t("dashboard.vat_taxable_supplies")}
+                </span>
+              </td></tr>
+              <VatRow line="81" label={t("dashboard.vat_line_19")}
+                base={fmt(salesByRate["19"]?.net ?? 0)}
+                tax={fmt(salesByRate["19"]?.vat ?? 0)} />
+              <VatRow line="86" label={t("dashboard.vat_line_7")}
+                base={fmt(salesByRate["7"]?.net ?? 0)}
+                tax={fmt(salesByRate["7"]?.vat ?? 0)} />
+              <VatRow line="87" label={t("dashboard.vat_line_0")}
+                base={fmt(salesByRate["0"]?.net ?? 0)}
+                tax={fmt(salesByRate["0"]?.vat ?? 0)} />
+              <tr><td colSpan={4} className="pt-4 pb-1">
+                <span className="text-[10px] font-black uppercase tracking-wider text-black">
+                  {t("dashboard.vat_input_section")}
+                </span>
+              </td></tr>
+              <VatRow line="66" label={t("dashboard.vat_input_label")}
+                tax={fmt(inputVat)} />
+              <tr className="border-t-2 border-amber-400">
+                <td className="pt-3 pb-2 pr-3 text-[11px] font-mono font-bold text-black w-8">83</td>
+                <td className="pt-3 pb-2">
+                  <span className="text-xs font-bold text-black">
+                    {netLiability >= 0 ? t("dashboard.vat_payable_label") : t("dashboard.vat_refund_label")}
+                  </span>
+                  <span className="block text-[10px] text-black/70 font-normal">
+                    {netLiability >= 0 ? t("dashboard.vat_payable_sub") : t("dashboard.vat_refund_sub")}
+                  </span>
+                </td>
+                <td />
+                <td className="pt-3 pb-2 text-right font-mono text-sm font-black text-black whitespace-nowrap pl-4 w-28">
+                  {netLiability < 0 ? "−" : ""}{fmt(Math.abs(netLiability))}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Umsatzsteuererklärung panel — annual VAT return · §18 UStG
+// ---------------------------------------------------------------------------
+function UStErkPanel({ allReceipts, period }: { allReceipts: Receipt[]; period: PeriodFilter }) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+
+  const currentYear  = new Date().getFullYear();
+  const year         = period.mode === "all" ? currentYear - 1 : period.year;
+  const yearReceipts = allReceipts.filter((r) => r.receipt_date?.startsWith(String(year)));
+
+  const purchases    = yearReceipts.filter((r) => r.receipt_type === "purchase");
+  const sales        = yearReceipts.filter((r) => r.receipt_type === "sale");
+  const inputVat     = purchases.reduce((s, r) => s + (r.vat_amount ?? 0), 0);
+  const outputVat    = sales.reduce((s, r) => s + (r.vat_amount ?? 0), 0);
+  const netLiability = outputVat - inputVat;
+
+  const salesByRate = sales.reduce<Record<string, { net: number; vat: number }>>((acc, r) => {
+    if (r.vat_percentage == null) return acc;
+    const key = String(r.vat_percentage);
+    if (!acc[key]) acc[key] = { net: 0, vat: 0 };
+    const net = r.net_amount ?? ((r.total_amount ?? 0) - (r.vat_amount ?? 0));
+    acc[key].net += net;
+    acc[key].vat += r.vat_amount ?? 0;
+    return acc;
+  }, {});
+
+  return (
+    <div className="bg-white border-2 border-amber-400 rounded">
+      <button
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-amber-50 transition-colors text-left"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <div>
+          <h3 className="text-black text-sm font-black uppercase tracking-wider">{t("dashboard.uste_title")}</h3>
+          <p className="text-[10px] text-black font-mono mt-0.5">{t("dashboard.uste_subtitle", { year })}</p>
+        </div>
+        <IconChevronDown className={`w-4 h-4 text-black shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="border-t border-amber-200 p-4 flex flex-col gap-4">
+
+          {/* Year badge */}
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold uppercase text-black">{t("dashboard.jab_year")}</span>
+            <span className="text-xs font-black font-mono text-black bg-amber-100 border border-amber-300 rounded px-2 py-0.5">{year}</span>
+            {period.mode === "all" && (
+              <span className="text-[10px] text-black font-mono">← {t("dashboard.jab_year_hint_all")}</span>
+            )}
+          </div>
+
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="border-b-2 border-black">
+                <th className="pb-1.5 pr-3 w-8" />
+                <th className="pb-1.5 text-left text-[10px] font-black uppercase tracking-wider text-black">
+                  {t("dashboard.uste_col_section")}
+                </th>
+                <th className="pb-1.5 text-right text-[10px] font-bold uppercase tracking-wider text-black/70 w-28 pl-6">
+                  {t("dashboard.vat_col_base")}
+                </th>
+                <th className="pb-1.5 text-right text-[10px] font-bold uppercase tracking-wider text-black/70 w-28 pl-4">
+                  {t("dashboard.vat_col_tax")}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colSpan={4} className="pt-3 pb-1">
+                <span className="text-[10px] font-black uppercase tracking-wider text-black">
+                  {t("dashboard.vat_taxable_supplies")}
+                </span>
+              </td></tr>
+              <VatRow line="81" label={t("dashboard.vat_line_19")}
+                base={fmt(salesByRate["19"]?.net ?? 0)}
+                tax={fmt(salesByRate["19"]?.vat ?? 0)} />
+              <VatRow line="86" label={t("dashboard.vat_line_7")}
+                base={fmt(salesByRate["7"]?.net ?? 0)}
+                tax={fmt(salesByRate["7"]?.vat ?? 0)} />
+              <VatRow line="87" label={t("dashboard.vat_line_0")}
+                base={fmt(salesByRate["0"]?.net ?? 0)}
+                tax={fmt(salesByRate["0"]?.vat ?? 0)} />
+              <tr><td colSpan={4} className="pt-4 pb-1">
+                <span className="text-[10px] font-black uppercase tracking-wider text-black">
+                  {t("dashboard.vat_input_section")}
+                </span>
+              </td></tr>
+              <VatRow line="66" label={t("dashboard.vat_input_label")}
+                tax={fmt(inputVat)} />
+              <tr className="border-t-2 border-amber-400">
+                <td className="pt-3 pb-2 pr-3 text-[11px] font-mono font-bold text-black w-8">83</td>
+                <td className="pt-3 pb-2">
+                  <span className="text-xs font-bold text-black">
+                    {netLiability >= 0 ? t("dashboard.vat_payable_label") : t("dashboard.vat_refund_label")}
+                  </span>
+                  <span className="block text-[10px] text-black/70 font-normal">
+                    {netLiability >= 0 ? t("dashboard.uste_payable_sub") : t("dashboard.uste_refund_sub")}
+                  </span>
+                </td>
+                <td />
+                <td className="pt-3 pb-2 text-right font-mono text-sm font-black text-black whitespace-nowrap pl-4 w-28">
+                  {netLiability < 0 ? "−" : ""}{fmt(Math.abs(netLiability))}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <p className="text-[10px] text-black font-mono leading-relaxed">
+            ℹ {t("dashboard.uste_disclaimer")}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Gewerbesteuererklärung panel — §§ 14 ff. GewStG
+// ---------------------------------------------------------------------------
+function computeGewerbeertrag(allReceipts: Receipt[], year: number): number {
+  let revenue = 0, expenses = 0;
+  for (const r of allReceipts) {
+    if (!r.receipt_date) continue;
+    const ry = parseInt(r.receipt_date.slice(0, 4), 10);
+    if (ry !== year) continue;
+    const net = r.net_amount ?? ((r.total_amount ?? 0) - (r.vat_amount ?? 0));
+    if (r.receipt_type === "purchase") expenses += net;
+    else revenue += net;
+  }
+  return Math.round((revenue - expenses) * 100) / 100;
+}
+
+function GewStPanel({ allReceipts, period, taxpayer, onEditTaxpayer }: {
+  allReceipts:     Receipt[];
+  period:          PeriodFilter;
+  taxpayer?:       TaxpayerProfile | null;
+  onEditTaxpayer?: () => void;
+}) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const hebesatz = taxpayer?.hebesatz ?? 400;
+
+  const currentYear = new Date().getFullYear();
+  const year = period.mode === "all" ? currentYear - 1 : period.year;
+
+  const gewerbeertrag        = computeGewerbeertrag(allReceipts, year);
+  // Round down to full 100 € — § 11 Abs. 1 GewStG
+  const gewerbeertragRounded = Math.floor(Math.max(gewerbeertrag, 0) / 100) * 100;
+  const steuermessbetrag     = Math.round(gewerbeertragRounded * 0.035 * 100) / 100;
+  const gewerbesteuer        = Math.round(steuermessbetrag * (hebesatz / 100) * 100) / 100;
+
+  const fE = (n: number) =>
+    n.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+
+  return (
+    <div className="bg-white border-2 border-amber-400 rounded">
+      <button
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-amber-50 transition-colors text-left"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <div>
+          <h3 className="text-black text-sm font-black uppercase tracking-wider">{t("dashboard.gewst_title")}</h3>
+          <p className="text-[10px] text-black font-mono mt-0.5">{t("dashboard.gewst_subtitle", { year })}</p>
+        </div>
+        <IconChevronDown className={`w-4 h-4 text-black shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="border-t border-amber-200 p-4 flex flex-col gap-4">
+
+          {/* Year badge */}
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold uppercase text-black">{t("dashboard.jab_year")}</span>
+            <span className="text-xs font-black font-mono text-black bg-amber-100 border border-amber-300 rounded px-2 py-0.5">{year}</span>
+            {period.mode === "all" && (
+              <span className="text-[10px] text-black font-mono">← {t("dashboard.jab_year_hint_all")}</span>
+            )}
+          </div>
+
+          {/* Hebesatz display + edit link */}
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[10px] font-bold uppercase text-black">{t("dashboard.gewst_hebesatz")}</span>
+              <span className="text-xs font-black font-mono text-black bg-amber-100 border border-amber-300 rounded px-2 py-0.5">{hebesatz} %</span>
+            </div>
+            {onEditTaxpayer && (
+              <button
+                onClick={onEditTaxpayer}
+                className="text-[10px] font-bold text-black underline underline-offset-2 hover:text-amber-700 transition-colors pb-0.5"
+              >
+                {t("sidebar.taxpayer_edit_btn")} →
+              </button>
+            )}
+          </div>
+
+          {/* Computation table */}
+          <table className="w-full text-xs font-mono border-collapse">
+            <tbody>
+              <tr className="border-b border-amber-100">
+                <td className="py-1.5 text-black">{t("dashboard.gewst_gewerbeertrag")}</td>
+                <td className="py-1.5 text-right text-black">{fE(gewerbeertrag)}</td>
+              </tr>
+              <tr className="border-b border-amber-100">
+                <td className="py-1.5 text-black/70 pl-4">{t("dashboard.gewst_rounded")}</td>
+                <td className="py-1.5 text-right text-black/70">{fE(gewerbeertragRounded)}</td>
+              </tr>
+              <tr className="border-b border-amber-100">
+                <td className="py-1.5 text-black">× {t("dashboard.gewst_steuermesszahl")} (3,5 %)</td>
+                <td className="py-1.5 text-right text-black">{fE(steuermessbetrag)}</td>
+              </tr>
+              <tr className="border-t-2 border-amber-300">
+                <td className="py-2 font-black text-black text-sm">
+                  × {t("dashboard.gewst_hebesatz")} ({hebesatz} %) = {t("dashboard.gewst_gewerbesteuer")}
+                </td>
+                <td className={`py-2 text-right font-black text-sm ${gewerbesteuer === 0 ? "text-black/60" : "text-black"}`}>
+                  {fE(gewerbesteuer)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          {gewerbeertrag <= 0 && (
+            <div className="bg-amber-50 border border-amber-300 rounded p-2 text-[11px] font-mono text-black/70">
+              {t("dashboard.gewst_no_liability")}
+            </div>
+          )}
+
+          <p className="text-[10px] text-black font-mono leading-relaxed">
+            ℹ {t("dashboard.gewst_disclaimer")}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 export default function Dashboard({ receipts, allReceipts, period, taxpayer, onEditTaxpayer }: Props) {
@@ -572,16 +910,6 @@ export default function Dashboard({ receipts, allReceipts, period, taxpayer, onE
 
   const expenseTotals = purchases.reduce<Record<string, number>>((acc, r) => {
     acc[r.category] = (acc[r.category] ?? 0) + (r.total_amount ?? 0);
-    return acc;
-  }, {});
-
-  const salesByRate = sales.reduce<Record<string, { net: number; vat: number }>>((acc, r) => {
-    if (r.vat_percentage == null) return acc;
-    const key = String(r.vat_percentage);
-    if (!acc[key]) acc[key] = { net: 0, vat: 0 };
-    const net = r.net_amount ?? ((r.total_amount ?? 0) - (r.vat_amount ?? 0));
-    acc[key].net += net;
-    acc[key].vat += r.vat_amount ?? 0;
     return acc;
   }, {});
 
@@ -661,83 +989,14 @@ export default function Dashboard({ receipts, allReceipts, period, taxpayer, onE
         )}
       </div>
 
-      {/* ELSTER-style VAT advance return */}
-      <div className="bg-white border-2 border-amber-400 rounded p-4">
-        <div className="flex items-baseline justify-between mb-1">
-          <h3 className="text-black text-sm font-black uppercase tracking-wider">
-            {t("dashboard.vat_title")}
-          </h3>
-        </div>
-        <p className="text-[10px] text-black/70 font-mono mb-4">
-          {receipts.length === 1
-            ? t("dashboard.vat_doc_count", { count: receipts.length })
-            : t("dashboard.vat_doc_count_plural", { count: receipts.length })}
-        </p>
+      {/* UMSATZSTEUER-VORANMELDUNG */}
+      <UStVAPanel receipts={receipts} />
 
-        <table className="w-full border-collapse">
-          <thead>
-            <tr className="border-b-2 border-black">
-              <th className="pb-1.5 pr-3 w-8" />
-              <th className="pb-1.5 text-left text-[10px] font-black uppercase tracking-wider text-black">
-                {t("dashboard.vat_col_section")}
-              </th>
-              <th className="pb-1.5 text-right text-[10px] font-bold uppercase tracking-wider text-black/70 w-28 pl-6">
-                {t("dashboard.vat_col_base")}
-              </th>
-              <th className="pb-1.5 text-right text-[10px] font-bold uppercase tracking-wider text-black/70 w-28 pl-4">
-                {t("dashboard.vat_col_tax")}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
+      {/* UMSATZSTEUERERKLÄRUNG */}
+      <UStErkPanel allReceipts={allReceipts} period={period} />
 
-            {/* Taxable supplies */}
-            <tr><td colSpan={4} className="pt-3 pb-1">
-              <span className="text-[10px] font-black uppercase tracking-wider text-black">
-                {t("dashboard.vat_taxable_supplies")}
-              </span>
-            </td></tr>
-
-            <VatRow line="81" label={t("dashboard.vat_line_19")}
-              base={fmt(salesByRate["19"]?.net ?? 0)}
-              tax={fmt(salesByRate["19"]?.vat ?? 0)} />
-            <VatRow line="86" label={t("dashboard.vat_line_7")}
-              base={fmt(salesByRate["7"]?.net ?? 0)}
-              tax={fmt(salesByRate["7"]?.vat ?? 0)} />
-            <VatRow line="87" label={t("dashboard.vat_line_0")}
-              base={fmt(salesByRate["0"]?.net ?? 0)}
-              tax={fmt(salesByRate["0"]?.vat ?? 0)} />
-
-            {/* Deductible input VAT */}
-            <tr><td colSpan={4} className="pt-4 pb-1">
-              <span className="text-[10px] font-black uppercase tracking-wider text-black">
-                {t("dashboard.vat_input_section")}
-              </span>
-            </td></tr>
-
-            <VatRow line="66" label={t("dashboard.vat_input_label")}
-              tax={fmt(inputVat)} />
-
-            {/* Net payable / refund */}
-            <tr className="border-t-2 border-amber-400">
-              <td className="pt-3 pb-2 pr-3 text-[11px] font-mono font-bold text-black w-8">83</td>
-              <td className="pt-3 pb-2">
-                <span className="text-xs font-bold text-black">
-                  {netLiability >= 0 ? t("dashboard.vat_payable_label") : t("dashboard.vat_refund_label")}
-                </span>
-                <span className="block text-[10px] text-black/70 font-normal">
-                  {netLiability >= 0 ? t("dashboard.vat_payable_sub") : t("dashboard.vat_refund_sub")}
-                </span>
-              </td>
-              <td />
-              <td className="pt-3 pb-2 text-right font-mono text-sm font-black text-black whitespace-nowrap pl-4 w-28">
-                {netLiability < 0 ? "−" : ""}{fmt(Math.abs(netLiability))}
-              </td>
-            </tr>
-
-          </tbody>
-        </table>
-      </div>
+      {/* GEWERBESTEUERERKLÄRUNG */}
+      <GewStPanel allReceipts={allReceipts} period={period} taxpayer={taxpayer} onEditTaxpayer={onEditTaxpayer} />
 
       {/* Jahresabschluss */}
       <JahresabschlussPanel allReceipts={allReceipts} period={period} taxpayer={taxpayer} onEditTaxpayer={onEditTaxpayer} />
@@ -746,9 +1005,7 @@ export default function Dashboard({ receipts, allReceipts, period, taxpayer, onE
       <div className="grid grid-cols-2 gap-3">
         {([
           { key: "eur", icon: "mdi:calculator-variant-outline" },
-          { key: "ust", icon: "mdi:file-percent-outline" },
           { key: "est", icon: "mdi:account-cash-outline" },
-          { key: "gst", icon: "mdi:domain" },
         ]).map(({ key, icon }) => (
           <div key={key}
             className="bg-white border-2 border-amber-400 border-dashed rounded p-6 flex flex-col items-center justify-center gap-2 text-center">

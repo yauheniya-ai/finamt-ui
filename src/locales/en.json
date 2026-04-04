@@ -166,7 +166,8 @@
     "taxpayer_company_section": "Company / GmbH Facts",
     "taxpayer_gruendungsjahr": "Year of incorporation",
     "taxpayer_stammkapital_field": "Share capital (registered, €)",
-    "taxpayer_eingezahlt_field": "Paid-in capital at founding (€)"
+    "taxpayer_eingezahlt_field": "Paid-in capital at founding (€)",
+    "taxpayer_hebesatz_field": "Trade tax multiplier – Hebesatz (%)"
   },
   "preview": {
     "empty": "Select a receipt from the sidebar\nto preview it here.",
@@ -334,6 +335,23 @@
     "count_invoices_plural": "{{n}} invoices",
     "count_receipts": "{{n}} receipt",
     "count_receipts_plural": "{{n}} receipts",
+
+    "gewst_title": "Trade Tax Return",
+    "gewst_subtitle": "Annual declaration · §§ 14 ff. GewStG · {{year}}",
+    "gewst_hebesatz": "Hebesatz (municipal multiplier)",
+    "gewst_gewerbeertrag": "Trade income (Gewerbeertrag, approx.)",
+    "gewst_rounded": "Rounded down to full € 100 (§ 11 GewStG)",
+    "gewst_steuermesszahl": "Tax measurement ratio (Steuermesszahl)",
+    "gewst_gewerbesteuer": "Trade Tax (Gewerbesteuer)",
+    "gewst_no_liability": "Trade income ≤ 0 — no trade tax liability for this period.",
+    "gewst_disclaimer": "Trade Tax Return (§ 14 GewStG): No Freibetrag applies to GmbH / Kapitalgesellschaft. Gewerbeertrag is approximated from the net income in this project. Adjustments (e.g. Hinzurechnungen § 8, Kürzungen § 9) must be made manually. File via ELSTER.",
+
+    "uste_title": "Annual VAT Return",
+    "uste_subtitle": "Annual declaration · §18 UStG · {{year}}",
+    "uste_col_section": "Annual VAT Return",
+    "uste_payable_sub": "Remaining annual balance (deduct prepayments)",
+    "uste_refund_sub": "Annual surplus (refund)",
+    "uste_disclaimer": "Annual VAT Return (§ 18 Abs. 3 UStG): Filing via ELSTER is mandatory. Figures are calculated from documents stored in this project. Verify completeness and correctness before submission. Advance payments (Vorauszahlungen) are offset by the tax authority.",
 
     "jab_title": "Annual Financial Statements",
     "jab_subtitle": "Balance Sheet + P&L \u00b7 \u00a7\u00a7 242\u2013256a HGB \u00b7 Simplified for Kleinstkapitalgesellschaft (\u00a7 267a HGB)",

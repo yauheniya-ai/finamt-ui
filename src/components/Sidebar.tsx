@@ -40,6 +40,7 @@ export type TaxpayerProfile = {
   gründungsjahr?: number | null;
   stammkapital?:  number | null;
   eingezahlt?:    number | null;
+  hebesatz?:      number | null; // Gewerbesteuer Hebesatz (%)
 };
 
 export type ReceiptItem = {
@@ -163,6 +164,7 @@ export function TaxpayerModal({ initial, onSave, onClear, onClose }: {
     gründungsjahr: initial?.gründungsjahr != null ? String(initial.gründungsjahr) : "",
     stammkapital:  initial?.stammkapital  != null ? String(initial.stammkapital)  : "",
     eingezahlt:    initial?.eingezahlt    != null ? String(initial.eingezahlt)    : "",
+    hebesatz:      initial?.hebesatz      != null ? String(initial.hebesatz)      : "",
   });
   const set = (key: keyof TaxpayerProfile) =>
     (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -181,6 +183,7 @@ export function TaxpayerModal({ initial, onSave, onClear, onClose }: {
       gründungsjahr: parse(numForm.gründungsjahr),
       stammkapital:  parse(numForm.stammkapital),
       eingezahlt:    parse(numForm.eingezahlt),
+      hebesatz:      parse(numForm.hebesatz),
     });
   };
 
@@ -253,14 +256,14 @@ export function TaxpayerModal({ initial, onSave, onClear, onClose }: {
               type="text"
               value={form.state}
               onChange={set("state")}
-              className="border border-black/20 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-amber-400 flex-1"
+              className="border border-black/20 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-amber-400 flex-1 min-w-0"
               placeholder={t("sidebar.taxpayer_state")}
             />
             <input
               type="text"
               value={form.country}
               onChange={set("country")}
-              className="border border-black/20 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-amber-400 flex-1"
+              className="border border-black/20 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-amber-400 flex-1 min-w-0"
               placeholder={t("sidebar.taxpayer_country")}
             />
           </div>
@@ -311,6 +314,21 @@ export function TaxpayerModal({ initial, onSave, onClear, onClose }: {
               placeholder="12500"
               min={0}
               step={0.01}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider">
+              {t("sidebar.taxpayer_hebesatz_field")}
+            </label>
+            <input
+              type="number"
+              value={numForm.hebesatz}
+              onChange={setNum("hebesatz")}
+              className="border border-black/20 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-amber-400"
+              placeholder="400"
+              min={200}
+              max={900}
+              step={50}
             />
           </div>
         </div>
