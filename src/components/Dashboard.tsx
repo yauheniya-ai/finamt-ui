@@ -90,7 +90,7 @@ function CategoryChart({ title, totals, receipts }: {
                     {fmt(total)}
                   </span>
                   <IconChevronDown
-                    className={`w-3.5 h-3.5 text-black/30 shrink-0 transition-transform ${
+                    className={`w-3.5 h-3.5 text-black shrink-0 transition-transform ${
                       isOpen ? "rotate-180" : ""
                     }`}
                   />
@@ -101,7 +101,7 @@ function CategoryChart({ title, totals, receipts }: {
                   <div className="ml-[9.5rem] mb-2 flex flex-col gap-1 border-l-2 border-amber-200 pl-3">
                     {supplierEntries.map(([name, amt]) => (
                       <div key={name} className="flex items-center justify-between gap-2">
-                        <span className="text-[11px] text-black/60 font-mono truncate">{name}</span>
+                        <span className="text-[11px] text-black/70 font-mono truncate">{name}</span>
                         <span className="text-[11px] text-black font-mono font-bold shrink-0">{fmt(amt)}</span>
                       </div>
                     ))}
@@ -129,7 +129,7 @@ function VatRow({ line, label, sublabel, base, tax, bold }: {
 }) {
   const textCls = bold ? "font-bold text-black" : "text-black/70";
   return (
-    <tr className="border-b border-black/10 last:border-0">
+    <tr className="border-b border-amber-100 last:border-0">
       <td className="py-1.5 pr-3 text-[11px] font-mono font-bold text-black w-8 shrink-0">
         {line ?? ""}
       </td>
@@ -154,10 +154,7 @@ const MATERIAL_CATS_JAB = new Set(["material", "equipment"]);
 const INCOME_CATS_JAB   = new Set(["services", "consulting", "products", "licensing"]);
 
 type JabSettings = {
-  gründungsjahr: number;
-  stammkapital:  number;
-  eingezahlt:    number;
-  nettomethode:  boolean;
+  nettomethode: boolean;
 };
 
 type JabResult = {
@@ -187,7 +184,14 @@ type JabResult = {
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
-function computeJab(allReceipts: Receipt[], s: JabSettings, year: number): JabResult {
+function computeJab(
+  allReceipts:   Receipt[],
+  gründungsjahr: number,
+  stammkapital:  number,
+  eingezahlt:    number,
+  nettomethode:  boolean,
+  year:          number,
+): JabResult {
   // Split receipts into prior years (for vortrag + opening cash)
   // and the reporting year (for GuV).
   let umsatzerlöse = 0, sonstigeBetriebserlöse = 0;
@@ -197,7 +201,7 @@ function computeJab(allReceipts: Receipt[], s: JabSettings, year: number): JabRe
   for (const r of allReceipts) {
     if (!r.receipt_date) continue;
     const ry = parseInt(r.receipt_date.slice(0, 4), 10);
-    if (ry < s.gründungsjahr || ry > year) continue;
+    if (ry < gründungsjahr || ry > year) continue;
     const net = r.net_amount ?? ((r.total_amount ?? 0) - (r.vat_amount ?? 0));
     const cat = r.category ?? "other";
     const isPurchase = r.receipt_type === "purchase";
@@ -231,17 +235,17 @@ function computeJab(allReceipts: Receipt[], s: JabSettings, year: number): JabRe
   //   Capital was injected ONCE in the Gründungsjahr.
   //   Each subsequent year's opening cash = prior year's closing cash
   //   = eingezahlt + cumulative net result of all prior years.
-  const openingCash  = r2(s.eingezahlt + priorNet);
+  const openingCash  = r2(eingezahlt + priorNet);
   const kassenbestand = r2(Math.max(openingCash + gesamtleistung - gesamtaufwand, 0));
 
-  const ausstehend = r2(s.stammkapital - s.eingezahlt);
-  const ausstehendeEinlagenAktiva = s.nettomethode ? 0 : ausstehend;
+  const ausstehend = r2(stammkapital - eingezahlt);
+  const ausstehendeEinlagenAktiva = nettomethode ? 0 : ausstehend;
   const summeAktiva = r2(kassenbestand + ausstehendeEinlagenAktiva);
 
-  const nichtEingefordert = s.nettomethode ? ausstehend : 0;
+  const nichtEingefordert = nettomethode ? ausstehend : 0;
   // Gewinnvortrag = cumulative result of all years BEFORE the reporting year.
   const gewinnvortrag     = priorNet;
-  const summeEigenkapital = r2(s.stammkapital - nichtEingefordert + gewinnvortrag + jahresergebnis);
+  const summeEigenkapital = r2(stammkapital - nichtEingefordert + gewinnvortrag + jahresergebnis);
   const summePassiva      = summeEigenkapital;
 
   const differenz    = r2(summeAktiva - summePassiva);
@@ -254,14 +258,19 @@ function computeJab(allReceipts: Receipt[], s: JabSettings, year: number): JabRe
     },
     bilanz: {
       kassenbestand, ausstehendeEinlagenAktiva, summeAktiva,
-      stammkapital: s.stammkapital, nichtEingefordert,
+      stammkapital, nichtEingefordert,
       jahresergebnis, gewinnvortrag,
       summeEigenkapital, summePassiva, ausgeglichen, differenz,
     },
   };
 }
 
-function JahresabschlussPanel({ allReceipts, period }: { allReceipts: Receipt[]; period: PeriodFilter }) {
+function JahresabschlussPanel({ allReceipts, period, taxpayer, onEditTaxpayer }: {
+  allReceipts:     Receipt[];
+  period:          PeriodFilter;
+  taxpayer?:       TaxpayerProfile | null;
+  onEditTaxpayer?: () => void;
+}) {
   const { t } = useTranslation();
   const currentYear = new Date().getFullYear();
 
@@ -270,38 +279,23 @@ function JahresabschlussPanel({ allReceipts, period }: { allReceipts: Receipt[];
 
   const [open, setOpen] = useState(false);
   const [s, setS] = useState<JabSettings>({
-    gründungsjahr: year,
-    stammkapital:  25000,
-    eingezahlt:    12500,
-    nettomethode:  true,
+    nettomethode: true,
   });
 
-  // Keep gründungsjahr ≤ year whenever period changes.
-  const gründungsjahr = Math.min(s.gründungsjahr, year);
+  // Company facts come from taxpayer profile (persisted in DB).
+  // Fall back to sensible defaults so the panel is always usable.
+  const gründungsjahr = Math.min(taxpayer?.gründungsjahr ?? year, year);
+  const stammkapital  = taxpayer?.stammkapital ?? 25000;
+  const eingezahlt    = taxpayer?.eingezahlt   ?? 12500;
 
-  const jab  = computeJab(allReceipts, { ...s, gründungsjahr }, year);
+  const jab  = computeJab(allReceipts, gründungsjahr, stammkapital, eingezahlt, s.nettomethode, year);
   const { guv, bilanz } = jab;
 
   const fE = (n: number) =>
     n.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
   const negFmt = (n: number) => (n < 0 ? `(${fE(Math.abs(n))})` : fE(n));
 
-  const numField = (key: keyof JabSettings, label: string, step = 500, disabled = false) => (
-    <label key={key} className="flex flex-col gap-0.5">
-      <span className="text-[10px] font-bold uppercase text-black/50">{label}</span>
-      <input
-        type="number" step={step}
-        value={s[key] as number}
-        disabled={disabled}
-        onChange={(e) => setS((p) => ({ ...p, [key]: parseFloat(e.target.value) || 0 }))}
-        className={`w-full border border-amber-300 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-black ${
-          disabled ? "bg-black/5 text-black/40 cursor-not-allowed" : "bg-amber-50"
-        }`}
-      />
-    </label>
-  );
-
-  const ausstehend = r2(s.stammkapital - s.eingezahlt);
+  const ausstehend = r2(stammkapital - eingezahlt);
   const isGründungsjahr = year === gründungsjahr;
 
   return (
@@ -314,9 +308,9 @@ function JahresabschlussPanel({ allReceipts, period }: { allReceipts: Receipt[];
       >
         <div>
           <h3 className="text-black text-sm font-black uppercase tracking-wider">{t("dashboard.jab_title")}</h3>
-          <p className="text-[10px] text-black/50 font-mono mt-0.5">{t("dashboard.jab_subtitle")}</p>
+          <p className="text-[10px] text-black font-mono mt-0.5">{t("dashboard.jab_subtitle")}</p>
         </div>
-        <IconChevronDown className={`w-4 h-4 text-black/30 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
+        <IconChevronDown className={`w-4 h-4 text-black shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
       {open && (
@@ -324,41 +318,41 @@ function JahresabschlussPanel({ allReceipts, period }: { allReceipts: Receipt[];
 
           {/* Period badge — shows the year derived from the sidebar */}
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold uppercase text-black/40">{t("dashboard.jab_year")}</span>
+            <span className="text-[10px] font-bold uppercase text-black">{t("dashboard.jab_year")}</span>
             <span className="text-xs font-black font-mono text-black bg-amber-100 border border-amber-300 rounded px-2 py-0.5">{year}</span>
             {period.mode === "all" && (
-              <span className="text-[10px] text-black/40 font-mono">← {t("dashboard.jab_year_hint_all")}</span>
+              <span className="text-[10px] text-black font-mono">← {t("dashboard.jab_year_hint_all")}</span>
             )}
           </div>
 
-          {/* Settings — one-time company facts only */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {/* Gründungsjahr — determines when capital was injected; capped to year */}
-            <label className="flex flex-col gap-0.5">
-              <span className="text-[10px] font-bold uppercase text-black/50">{t("dashboard.jab_gründungsjahr")}</span>
-              <input
-                type="number" step={1}
-                value={s.gründungsjahr}
-                max={year}
-                onChange={(e) => {
-                  const gy = Math.min(parseInt(e.target.value, 10) || year, year);
-                  setS((p) => ({ ...p, gründungsjahr: gy }));
-                }}
-                className="w-full border border-amber-300 rounded px-2 py-1 text-xs font-mono bg-amber-50 focus:outline-none focus:border-black"
-              />
-            </label>
-            {numField("stammkapital", t("dashboard.jab_stammkapital"))}
-            {numField("eingezahlt",   t("dashboard.jab_eingezahlt"))}
+          {/* Settings — company facts (read-only, edit via taxpayer profile) */}
+          <div className="flex flex-wrap items-end gap-3">
+            {/* Read-only company facts */}
+            <div className="flex flex-wrap gap-2">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[10px] font-bold uppercase text-black">{t("dashboard.jab_gründungsjahr")}</span>
+                <span className="text-xs font-black font-mono text-black bg-amber-100 border border-amber-300 rounded px-2 py-0.5">{gründungsjahr}</span>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[10px] font-bold uppercase text-black">{t("dashboard.jab_stammkapital")}</span>
+                <span className="text-xs font-black font-mono text-black bg-amber-100 border border-amber-300 rounded px-2 py-0.5">{fE(stammkapital)}</span>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[10px] font-bold uppercase text-black">{t("dashboard.jab_eingezahlt")}</span>
+                <span className="text-xs font-black font-mono text-black bg-amber-100 border border-amber-300 rounded px-2 py-0.5">{fE(eingezahlt)}</span>
+              </div>
+            </div>
+            {/* Nettomethode toggle */}
             <div className="flex flex-col gap-0.5">
-              <span className="text-[10px] font-bold uppercase text-black/50">{t("dashboard.jab_method")}</span>
-              <div className="flex gap-2 items-center pt-1">
+              <span className="text-[10px] font-bold uppercase text-black">{t("dashboard.jab_method")}</span>
+              <div className="flex gap-2 items-center">
                 {([true, false] as const).map((v) => (
                   <button key={String(v)}
                     onClick={() => setS((p) => ({ ...p, nettomethode: v }))}
                     className={`text-[10px] px-2 py-1 rounded border font-bold transition-colors ${
                       s.nettomethode === v
                         ? "bg-black text-amber-400 border-black"
-                        : "bg-white text-black/50 border-amber-300 hover:border-black"
+                        : "bg-white text-black border-amber-300 hover:border-black"
                     }`}
                   >
                     {v ? t("dashboard.jab_netto") : t("dashboard.jab_brutto")}
@@ -366,6 +360,15 @@ function JahresabschlussPanel({ allReceipts, period }: { allReceipts: Receipt[];
                 ))}
               </div>
             </div>
+            {/* Edit link */}
+            {onEditTaxpayer && (
+              <button
+                onClick={onEditTaxpayer}
+                className="text-[10px] font-bold text-black underline underline-offset-2 hover:text-amber-700 transition-colors pb-0.5"
+              >
+                {t("sidebar.taxpayer_edit_btn")} →
+              </button>
+            )}
           </div>
 
           {/* Gründungsjahr / partially paid-in note */}
@@ -373,8 +376,8 @@ function JahresabschlussPanel({ allReceipts, period }: { allReceipts: Receipt[];
             <div className="bg-amber-50 border border-amber-300 rounded p-3 text-[11px] font-mono text-black/70 leading-relaxed">
               <strong className="text-black">{t("dashboard.jab_gruendung_title")}</strong>{" "}
               {t("dashboard.jab_gruendung_note", {
-                stammkapital: fE(s.stammkapital),
-                eingezahlt:   fE(s.eingezahlt),
+                stammkapital: fE(stammkapital),
+                eingezahlt:   fE(eingezahlt),
                 ausstehend:   fE(ausstehend),
               })}
               {s.nettomethode && (
@@ -383,9 +386,11 @@ function JahresabschlussPanel({ allReceipts, period }: { allReceipts: Receipt[];
             </div>
           )}
           {!isGründungsjahr && jab.bilanz.gewinnvortrag !== 0 && (
-            <div className="bg-black/5 border border-black/10 rounded p-2 text-[11px] font-mono text-black/60">
+            <div className="bg-amber-50 border border-amber-300 rounded p-2 text-[11px] font-mono text-black/70">
               {t("dashboard.jab_vortrag_computed", {
-                years: `${gründungsjahr}–${year - 1}`,
+                years: gründungsjahr === year - 1
+                  ? `${gründungsjahr}`
+                  : `${gründungsjahr}\u2013${year - 1}`,
                 amount: negFmt(jab.bilanz.gewinnvortrag),
               })}
             </div>
@@ -398,25 +403,25 @@ function JahresabschlussPanel({ allReceipts, period }: { allReceipts: Receipt[];
             </h4>
             <table className="w-full text-xs font-mono border-collapse">
               <tbody>
-                <tr className="border-b border-black/10">
-                  <td className="py-1 pl-2 text-black/60">{t("dashboard.jab_umsatzerlöse")}</td>
+                <tr className="border-b border-amber-100">
+                  <td className="py-1 pl-2 text-black">{t("dashboard.jab_umsatzerlöse")}</td>
                   <td className="py-1 text-right">{fE(guv.umsatzerlöse)}</td>
                 </tr>
-                <tr className="border-b border-black/10">
-                  <td className="py-1 pl-2 text-black/60">{t("dashboard.jab_sonstige_erlöse")}</td>
+                <tr className="border-b border-amber-100">
+                  <td className="py-1 pl-2 text-black">{t("dashboard.jab_sonstige_erlöse")}</td>
                   <td className="py-1 text-right">{fE(guv.sonstigeBetriebserlöse)}</td>
                 </tr>
                 <tr className="border-b-2 border-amber-200">
                   <td className="py-1 pl-2 font-bold text-black">= {t("dashboard.jab_gesamtleistung")}</td>
                   <td className="py-1 text-right font-bold text-black">{fE(guv.gesamtleistung)}</td>
                 </tr>
-                <tr className="border-b border-black/10">
-                  <td className="py-1 pl-2 text-black/60">− {t("dashboard.jab_materialaufwand")}</td>
-                  <td className="py-1 text-right text-black/60">{fE(guv.materialaufwand)}</td>
+                <tr className="border-b border-amber-100">
+                  <td className="py-1 pl-2 text-black">− {t("dashboard.jab_materialaufwand")}</td>
+                  <td className="py-1 text-right text-black">{fE(guv.materialaufwand)}</td>
                 </tr>
-                <tr className="border-b border-black/10">
-                  <td className="py-1 pl-2 text-black/60">− {t("dashboard.jab_sonstige_aufwendungen")}</td>
-                  <td className="py-1 text-right text-black/60">{fE(guv.sonstigeBetriebsausgaben)}</td>
+                <tr className="border-b border-amber-100">
+                  <td className="py-1 pl-2 text-black">− {t("dashboard.jab_sonstige_aufwendungen")}</td>
+                  <td className="py-1 text-right text-black">{fE(guv.sonstigeBetriebsausgaben)}</td>
                 </tr>
                 <tr className="border-t-2 border-amber-300">
                   <td className="py-2 pl-2 font-black text-black text-sm">= {t("dashboard.jab_jahresergebnis")}</td>
@@ -438,26 +443,26 @@ function JahresabschlussPanel({ allReceipts, period }: { allReceipts: Receipt[];
 
               {/* AKTIVA */}
               <div>
-                <p className="text-[10px] font-black uppercase tracking-wider text-black/40 mb-1.5">
+                <p className="text-[10px] font-black uppercase tracking-wider text-black mb-1.5">
                   {t("dashboard.jab_aktiva")}
                 </p>
                 <table className="w-full text-xs font-mono border-collapse">
                   <tbody>
-                    <tr className="border-b border-black/10">
-                      <td className="py-1 text-black/50">A. {t("dashboard.jab_anlagevermögen")}</td>
+                    <tr className="border-b border-amber-100">
+                      <td className="py-1 text-black/70">A. {t("dashboard.jab_anlagevermögen")}</td>
                       <td className="py-1 text-right">0,00 €</td>
                     </tr>
-                    <tr className="border-b border-black/10">
-                      <td className="py-1 text-black/50">B. {t("dashboard.jab_umlaufvermögen")}</td>
+                    <tr className="border-b border-amber-100">
+                      <td className="py-1 text-black/70">B. {t("dashboard.jab_umlaufvermögen")}</td>
                       <td />
                     </tr>
-                    <tr className="border-b border-black/10">
+                    <tr className="border-b border-amber-100">
                       <td className="py-1 pl-4 text-black/70">III. {t("dashboard.jab_kassenbestand")}</td>
                       <td className="py-1 text-right font-bold">{fE(bilanz.kassenbestand)}</td>
                     </tr>
                     {!s.nettomethode && bilanz.ausstehendeEinlagenAktiva > 0 && (
-                      <tr className="border-b border-black/10">
-                        <td className="py-1 text-black/50">C. {t("dashboard.jab_ausstehende_aktiva")}</td>
+                      <tr className="border-b border-amber-100">
+                        <td className="py-1 text-black/70">C. {t("dashboard.jab_ausstehende_aktiva")}</td>
                         <td className="py-1 text-right font-bold">{fE(bilanz.ausstehendeEinlagenAktiva)}</td>
                       </tr>
                     )}
@@ -471,33 +476,33 @@ function JahresabschlussPanel({ allReceipts, period }: { allReceipts: Receipt[];
 
               {/* PASSIVA */}
               <div>
-                <p className="text-[10px] font-black uppercase tracking-wider text-black/40 mb-1.5">
+                <p className="text-[10px] font-black uppercase tracking-wider text-black mb-1.5">
                   {t("dashboard.jab_passiva")}
                 </p>
                 <table className="w-full text-xs font-mono border-collapse">
                   <tbody>
-                    <tr className="border-b border-black/10">
-                      <td className="py-1 text-black/50">A. {t("dashboard.jab_eigenkapital")}</td>
+                    <tr className="border-b border-amber-100">
+                      <td className="py-1 text-black/70">A. {t("dashboard.jab_eigenkapital")}</td>
                       <td />
                     </tr>
-                    <tr className="border-b border-black/10">
+                    <tr className="border-b border-amber-100">
                       <td className="py-1 pl-3 text-black/70">I. {t("dashboard.jab_gezeichnetes_kapital")}</td>
                       <td className="py-1 text-right">{fE(bilanz.stammkapital)}</td>
                     </tr>
                     {s.nettomethode && bilanz.nichtEingefordert > 0 && (
-                      <tr className="border-b border-black/10">
-                        <td className="py-1 pl-3 text-black/50 italic">./. {t("dashboard.jab_nicht_eingefordert")}</td>
+                      <tr className="border-b border-amber-100">
+                        <td className="py-1 pl-3 text-black/70 italic">./. {t("dashboard.jab_nicht_eingefordert")}</td>
                         <td className="py-1 text-right text-red-700">({fE(bilanz.nichtEingefordert)})</td>
                       </tr>
                     )}
-                    <tr className="border-b border-black/10">
+                    <tr className="border-b border-amber-100">
                       <td className="py-1 pl-3 text-black/70">III. {t("dashboard.jab_jahresergebnis_passiva")}</td>
                       <td className={`py-1 text-right ${bilanz.jahresergebnis < 0 ? "text-red-700" : ""}`}>
                         {negFmt(bilanz.jahresergebnis)}
                       </td>
                     </tr>
                     {bilanz.gewinnvortrag !== 0 && (
-                      <tr className="border-b border-black/10">
+                      <tr className="border-b border-amber-100">
                         <td className="py-1 pl-3 text-black/70">IV. {t("dashboard.jab_gewinnvortrag")}</td>
                         <td className={`py-1 text-right ${bilanz.gewinnvortrag < 0 ? "text-red-700" : ""}`}>
                           {negFmt(bilanz.gewinnvortrag)}
@@ -524,7 +529,7 @@ function JahresabschlussPanel({ allReceipts, period }: { allReceipts: Receipt[];
                 : `✗ ${t("dashboard.jab_unbalanced", { diff: fE(Math.abs(bilanz.differenz)) })}`}
             </div>
 
-            <p className="text-[10px] text-black/40 font-mono mt-3 leading-relaxed">
+            <p className="text-[10px] text-black font-mono mt-3 leading-relaxed">
               ℹ {t("dashboard.jab_disclaimer")}
             </p>
           </div>
@@ -587,28 +592,28 @@ export default function Dashboard({ receipts, allReceipts, period, taxpayer, onE
       <div className="border-b-2 border-amber-400 pb-3 flex items-start justify-between gap-4">
         <div>
           <h2 className="text-black text-xl font-black uppercase tracking-tight">{t("dashboard.title")}</h2>
-          <p className="text-black/50 text-xs font-mono mt-0.5">{periodLabel}</p>
+          <p className="text-black text-xs font-mono mt-0.5">{periodLabel}</p>
         </div>
         {taxpayer?.name && (
           <div className="text-right shrink-0">
             <p className="text-black text-xs font-bold font-mono">
               {taxpayer.name}
               {(taxpayer.vat_id || taxpayer.tax_number) && (
-                <span className="text-black/50 font-normal ml-1.5">
+                <span className="text-black font-normal ml-1.5">
                   ({[taxpayer.vat_id, taxpayer.tax_number].filter(Boolean).join(" • ")})
                 </span>
               )}
             </p>
             <div className="flex items-baseline justify-end gap-2 mt-0.5">
               {(taxpayer.street || taxpayer.address_supplement || taxpayer.city) && (
-                <p className="text-black/50 text-[11px] font-mono">
+                <p className="text-black text-[11px] font-mono">
                   {[taxpayer.street, taxpayer.address_supplement, [taxpayer.postcode, taxpayer.city].filter(Boolean).join(" "), taxpayer.state, taxpayer.country].filter(Boolean).join(", ")}
                 </p>
               )}
               {onEditTaxpayer && (
                 <button
                   onClick={onEditTaxpayer}
-                  className="text-[10px] text-black/30 hover:text-black font-bold underline underline-offset-2 shrink-0"
+                  className="text-[10px] text-black hover:text-amber-700 font-bold underline underline-offset-2 shrink-0"
                 >
                   {t("sidebar.taxpayer_edit_btn")}
                 </button>
@@ -735,7 +740,7 @@ export default function Dashboard({ receipts, allReceipts, period, taxpayer, onE
       </div>
 
       {/* Jahresabschluss */}
-      <JahresabschlussPanel allReceipts={allReceipts} period={period} />
+      <JahresabschlussPanel allReceipts={allReceipts} period={period} taxpayer={taxpayer} onEditTaxpayer={onEditTaxpayer} />
 
       {/* Tax return tiles */}
       <div className="grid grid-cols-2 gap-3">
@@ -747,10 +752,10 @@ export default function Dashboard({ receipts, allReceipts, period, taxpayer, onE
         ]).map(({ key, icon }) => (
           <div key={key}
             className="bg-white border-2 border-amber-400 border-dashed rounded p-6 flex flex-col items-center justify-center gap-2 text-center">
-            <Icon icon={icon} className="w-7 h-7 text-black/20" />
+            <Icon icon={icon} className="w-7 h-7 text-black/70" />
             <span className="text-black/70 text-sm font-black uppercase tracking-wider">{t(`dashboard.tile_${key}_title`)}</span>
-            <span className="text-black/40 text-[10px] font-mono">{t(`dashboard.tile_${key}_sub`)}</span>
-            <span className="text-black/40 text-xs font-mono">{t("dashboard.coming_soon")}</span>
+            <span className="text-black text-[10px] font-mono">{t(`dashboard.tile_${key}_sub`)}</span>
+            <span className="text-black text-xs font-mono">{t("dashboard.coming_soon")}</span>
           </div>
         ))}
       </div>

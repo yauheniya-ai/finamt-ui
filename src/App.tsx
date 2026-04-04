@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import Header from "./components/Header";
-import Sidebar, { type Receipt, type PeriodFilter, type TaxpayerProfile, TaxpayerModal, DEFAULT_PERIOD, filterByPeriod } from "./components/Sidebar";
+import Sidebar, { type Receipt, type PeriodFilter, type TaxpayerProfile, type ManualEntryForm, TaxpayerModal, DEFAULT_PERIOD, filterByPeriod } from "./components/Sidebar";
 import Dashboard from "./components/Dashboard";
 import PreviewPanel from "./components/PreviewPanel";
 import { type DBInfo } from "./components/DBSelector";
@@ -151,6 +151,34 @@ export default function App() {
     }
   }, [activeDb]);
 
+  const handleManualEntry = useCallback(async (entry: ManualEntryForm) => {
+    setError(null);
+    try {
+      const qs = activeDb ? `?db=${encodeURIComponent(activeDb)}` : "";
+      const body = {
+        date:           entry.date,
+        vendor:         entry.vendor || null,
+        receipt_type:   entry.receipt_type,
+        category:       entry.category,
+        net_amount:     parseFloat(entry.net_amount) || 0,
+        vat_percentage: parseFloat(entry.vat_percentage) || 0,
+        description:    entry.description || null,
+        currency:       entry.currency,
+      };
+      const res = await fetch(`${API_BASE}/receipts${qs}`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error((await res.json()).detail ?? "Save failed.");
+      const receipt: Receipt = await res.json();
+      setReceipts((prev) => [receipt, ...prev.filter((r) => r.id !== receipt.id)]);
+      setSelected(receipt);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Could not save entry.");
+    }
+  }, [activeDb]);
+
   const handleSaved = useCallback((updated: Receipt) => {
     setReceipts((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
     setSelected(updated);
@@ -183,6 +211,7 @@ export default function App() {
           selectedId={selected?.id ?? null}
           onSelect={setSelected}
           onUpload={handleUpload}
+          onManualEntry={handleManualEntry}
           onDelete={handleDelete}
           uploading={uploading}
           progressStep={progressStep}

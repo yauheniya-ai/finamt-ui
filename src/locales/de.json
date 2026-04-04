@@ -5,6 +5,16 @@
   "sidebar": {
     "upload_receipt": "Beleg hochladen",
     "upload_invoice": "Rechnung hochladen",
+    "manual_entry_btn": "Eintrag erstellen",
+    "manual_entry_title": "Manueller Eintrag",
+    "manual_entry_vendor": "Gegenpartei",
+    "manual_entry_date": "Datum",
+    "manual_entry_net": "Nettobetrag (€)",
+    "manual_entry_vat": "Mehrwertsteuersatz (%)",
+    "manual_entry_category": "Kategorie",
+    "manual_entry_type": "Typ",
+    "manual_entry_description": "Notizen (optional)",
+    "manual_entry_save": "Eintrag speichern",
     "cancel_upload": "Upload abbrechen",
     "processing": "Verarbeitung…",
     "expense": "Ausgabe",
@@ -152,7 +162,11 @@
     "taxpayer_country": "Land",
     "taxpayer_save": "Speichern",
     "taxpayer_clear": "Löschen",
-    "taxpayer_close": "Schließen"
+    "taxpayer_close": "Schließen",
+    "taxpayer_company_section": "Unternehmens-/GmbH-Daten",
+    "taxpayer_gruendungsjahr": "Gründungsjahr",
+    "taxpayer_stammkapital_field": "Stammkapital (eingetragen, €)",
+    "taxpayer_eingezahlt_field": "Eingezahltes Kapital bei Gründung (€)"
   },
   "preview": {
     "empty": "Wähle einen Beleg aus der Seitenleiste\naus, um ihn hier anzuzeigen.",
@@ -326,7 +340,7 @@
     "jab_gr\u00fcndungsjahr": "Gr\u00fcndungsjahr",
     "jab_year": "Berichtsjahr",
     "jab_year_hint_all": "Seitenleiste auf ein bestimmtes Jahr stellen für Jahresberichte",
-    "jab_stammkapital": "Stammkapital (eingetragen)",
+    "jab_stammkapital": "Stammkapital (reg.)",
     "jab_eingezahlt": "Eingezahltes Kapital",
     "jab_vortrag": "Gewinn-/Verlustvortrag",
     "jab_vortrag_computed": "Gewinnvortrag automatisch berechnet aus {{years}}: {{amount}}",
@@ -357,7 +371,7 @@
     "jab_jahresergebnis_passiva": "Jahres\u00fcberschuss / -fehlbetrag",
     "jab_gewinnvortrag": "Gewinn-/Verlustvortrag",
     "jab_summe_passiva": "Summe Passiva",
-    "jab_balanced": "Bilanz ausgeglichen \u2014 Aktiva = Passiva.",
+    "jab_balanced": "Bilanz ausgeglichen: Aktiva = Passiva.",
     "jab_unbalanced": "Differenz {{diff}} \u2014 bitte manuell pr\u00fcfen.",
     "jab_disclaimer": "Kleinstkapitalgesellschaft (§ 267a HGB): Es besteht keine gesetzliche Pflicht, einen Steuerberater einzuschalten. E-Bilanz (ELSTER), Jahresabschluss und Bundesanzeiger-Einreichung k\u00f6nnen von der Gesch\u00e4ftsf\u00fchrung selbst erledigt werden, sofern die fachlichen Anforderungen erf\u00fcllt sind. Ben\u00f6tigt wird ein ELSTER-Zertifikat f\u00fcr die GmbH."
   },

@@ -36,6 +36,10 @@ export type TaxpayerProfile = {
   city:               string;
   state:              string;
   country:            string;
+  // GmbH company facts — optional, persisted in DB
+  gründungsjahr?: number | null;
+  stammkapital?:  number | null;
+  eingezahlt?:    number | null;
 };
 
 export type ReceiptItem = {
@@ -154,9 +158,31 @@ export function TaxpayerModal({ initial, onSave, onClear, onClose }: {
     state:              initial?.state              ?? "",
     country:            initial?.country            ?? "",
   });
+  // String inputs for numeric fields (empty string ⇒ null)
+  const [numForm, setNumForm] = useState({
+    gründungsjahr: initial?.gründungsjahr != null ? String(initial.gründungsjahr) : "",
+    stammkapital:  initial?.stammkapital  != null ? String(initial.stammkapital)  : "",
+    eingezahlt:    initial?.eingezahlt    != null ? String(initial.eingezahlt)    : "",
+  });
   const set = (key: keyof TaxpayerProfile) =>
     (e: React.ChangeEvent<HTMLInputElement>) =>
       setForm((prev) => ({ ...prev, [key]: e.target.value }));
+  const setNum = (key: keyof typeof numForm) =>
+    (e: React.ChangeEvent<HTMLInputElement>) =>
+      setNumForm((prev) => ({ ...prev, [key]: e.target.value }));
+
+  const handleSave = () => {
+    const parse = (s: string): number | null => {
+      const n = parseFloat(s);
+      return isNaN(n) ? null : n;
+    };
+    onSave({
+      ...form,
+      gründungsjahr: parse(numForm.gründungsjahr),
+      stammkapital:  parse(numForm.stammkapital),
+      eingezahlt:    parse(numForm.eingezahlt),
+    });
+  };
 
   return (
     <div
@@ -179,7 +205,7 @@ export function TaxpayerModal({ initial, onSave, onClear, onClose }: {
             </label>
             <input
               type="text"
-              value={form[key]}
+              value={form[key] as string}
               onChange={set(key)}
               className="border border-black/20 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-amber-400"
               placeholder={t(`sidebar.taxpayer_${key}`)}
@@ -240,9 +266,58 @@ export function TaxpayerModal({ initial, onSave, onClear, onClose }: {
           </div>
         </div>
 
+        {/* GmbH / Company facts */}
+        <div className="flex flex-col gap-1.5 pt-1 border-t border-black/5">
+          <span className="text-[10px] text-black/40 font-bold uppercase tracking-wider">
+            {t("sidebar.taxpayer_company_section")}
+          </span>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider">
+              {t("sidebar.taxpayer_gruendungsjahr")}
+            </label>
+            <input
+              type="number"
+              value={numForm.gründungsjahr}
+              onChange={setNum("gründungsjahr")}
+              className="border border-black/20 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-amber-400"
+              placeholder={String(new Date().getFullYear())}
+              min={1900}
+              max={2100}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider">
+              {t("sidebar.taxpayer_stammkapital_field")}
+            </label>
+            <input
+              type="number"
+              value={numForm.stammkapital}
+              onChange={setNum("stammkapital")}
+              className="border border-black/20 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-amber-400"
+              placeholder="25000"
+              min={0}
+              step={0.01}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider">
+              {t("sidebar.taxpayer_eingezahlt_field")}
+            </label>
+            <input
+              type="number"
+              value={numForm.eingezahlt}
+              onChange={setNum("eingezahlt")}
+              className="border border-black/20 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-amber-400"
+              placeholder="12500"
+              min={0}
+              step={0.01}
+            />
+          </div>
+        </div>
+
         <div className="flex gap-2 mt-1">
           <button
-            onClick={() => onSave(form)}
+            onClick={handleSave}
             className="flex-1 bg-black text-amber-400 text-xs font-bold py-1.5 rounded hover:bg-black/80 transition-colors"
           >
             {t("sidebar.taxpayer_save")}
@@ -257,7 +332,159 @@ export function TaxpayerModal({ initial, onSave, onClear, onClose }: {
           )}
           <button
             onClick={onClose}
-            className="bg-black/5 hover:bg-black/10 text-black/50 text-xs font-bold py-1.5 px-3 rounded transition-colors"
+            className="bg-amber-50 hover:bg-amber-100 text-black text-xs font-bold py-1.5 px-3 rounded transition-colors"
+          >
+            {t("sidebar.taxpayer_close")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Manual entry modal
+// ---------------------------------------------------------------------------
+
+export type ManualEntryForm = {
+  date:           string;
+  vendor:         string;
+  receipt_type:   "purchase" | "sale";
+  category:       string;
+  net_amount:     string;   // string for controlled input, parsed on save
+  vat_percentage: string;   // string for controlled input
+  description:    string;
+  currency:       string;
+};
+
+export function ManualEntryModal({ onSave, onClose }: {
+  onSave:  (data: ManualEntryForm) => void;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const [form, setForm] = useState<ManualEntryForm>({
+    date:           new Date().toISOString().slice(0, 10),
+    vendor:         "",
+    receipt_type:   "purchase",
+    category:       "other",
+    net_amount:     "",
+    vat_percentage: "19",
+    description:    "",
+    currency:       "EUR",
+  });
+  const set = (key: keyof ManualEntryForm) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+      setForm((prev) => ({ ...prev, [key]: e.target.value }));
+
+  const inputCls = "border border-black/20 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-amber-400 w-full";
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white border-2 border-amber-400 rounded p-5 w-80 flex flex-col gap-3 shadow-xl max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h4 className="text-black text-sm font-black uppercase tracking-wider">
+          {t("sidebar.manual_entry_title")}
+        </h4>
+
+        {/* Type toggle */}
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider">
+            {t("sidebar.manual_entry_type")}
+          </label>
+          <div className="flex rounded border border-black/10 overflow-hidden text-xs font-bold">
+            {(["purchase", "sale"] as const).map((type) => (
+              <button
+                key={type}
+                type="button"
+                onClick={() => setForm((p) => ({ ...p, receipt_type: type }))}
+                className={`flex-1 py-1 transition-colors ${
+                  form.receipt_type === type
+                    ? "bg-black text-white"
+                    : "bg-white text-black/40 hover:bg-amber-50"
+                }`}
+              >
+                {type === "purchase" ? t("sidebar.expense") : t("sidebar.revenue")}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Date */}
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider">
+            {t("sidebar.manual_entry_date")}
+          </label>
+          <input type="date" value={form.date} onChange={set("date")} className={inputCls} />
+        </div>
+
+        {/* Vendor */}
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider">
+            {t("sidebar.manual_entry_vendor")}
+          </label>
+          <input type="text" value={form.vendor} onChange={set("vendor")} className={inputCls}
+            placeholder="e.g. Finanzamt Berlin" />
+        </div>
+
+        {/* Category */}
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider">
+            {t("sidebar.manual_entry_category")}
+          </label>
+          <select value={form.category} onChange={set("category")} className={inputCls}>
+            {Object.keys(CATEGORY_META).map((k) => (
+              <option key={k} value={k}>{t(`sidebar.categories.${k}`, k)}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Net amount + VAT */}
+        <div className="flex gap-2">
+          <div className="flex flex-col gap-1 flex-1">
+            <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider">
+              {t("sidebar.manual_entry_net")}
+            </label>
+            <input type="number" value={form.net_amount} onChange={set("net_amount")}
+              className={inputCls} placeholder="0.00" min={0} step={0.01} />
+          </div>
+          <div className="flex flex-col gap-1 w-24">
+            <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider">
+              {t("sidebar.manual_entry_vat")}
+            </label>
+            <select value={form.vat_percentage} onChange={set("vat_percentage")} className={inputCls}>
+              {["0", "7", "19"].map((r) => (
+                <option key={r} value={r}>{r} %</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Notes */}
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider">
+            {t("sidebar.manual_entry_description")}
+          </label>
+          <textarea value={form.description} onChange={set("description")}
+            rows={2}
+            className="border border-black/20 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-amber-400 w-full resize-none"
+            placeholder="e.g. VAT refund Q1 2024" />
+        </div>
+
+        <div className="flex gap-2 mt-1">
+          <button
+            onClick={() => onSave(form)}
+            className="flex-1 bg-black text-amber-400 text-xs font-bold py-1.5 rounded hover:bg-black/80 transition-colors"
+          >
+            {t("sidebar.manual_entry_save")}
+          </button>
+          <button
+            onClick={onClose}
+            className="bg-amber-50 hover:bg-amber-100 text-black text-xs font-bold py-1.5 px-3 rounded transition-colors"
           >
             {t("sidebar.taxpayer_close")}
           </button>
@@ -311,6 +538,7 @@ type Props = {
   selectedId:       string | null;
   onSelect:         (receipt: Receipt) => void;
   onUpload:         (files: File[], type: "purchase" | "sale") => void;
+  onManualEntry:    (data: ManualEntryForm) => void;
   onDelete:         (id: string) => void;
   uploading:        boolean;
   progressStep?:    string | null;
@@ -494,7 +722,7 @@ function SectionDivider({ label, count, total, isRevenue, isOpen, onToggle }: { 
 // MONTHS rendered via t("sidebar.months") array
 
 export default function Sidebar({
-  receipts, selectedId, onSelect, onUpload, onDelete, uploading, progressStep, onCancelUpload, error,
+  receipts, selectedId, onSelect, onUpload, onManualEntry, onDelete, uploading, progressStep, onCancelUpload, error,
   period, onPeriodChange, taxpayer, onEditTaxpayer,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -504,6 +732,7 @@ export default function Sidebar({
   const { t } = useTranslation();
   const [uploadType,      setUploadType]      = useState<"purchase" | "sale">("purchase");
   const [confirmingId,    setConfirmingId]    = useState<string | null>(null);
+  const [showManualEntry, setShowManualEntry] = useState(false);
 
   const grouped = receipts.reduce<Record<string, Receipt[]>>((acc, r) => {
     // Normalize any category not in CATEGORY_META to "other" so it always renders
@@ -621,6 +850,16 @@ export default function Sidebar({
             </button>
           )}
         </div>
+
+        {/* Manual entry button */}
+        <button
+          onClick={() => setShowManualEntry(true)}
+          disabled={uploading}
+          className="flex items-center justify-center gap-2 border border-amber-400 hover:border-black bg-amber-50 hover:bg-amber-100 disabled:opacity-40 disabled:cursor-not-allowed text-black font-bold text-xs py-1.5 px-3 rounded transition-colors"
+        >
+          <Icon icon="mdi:pencil-plus-outline" className="w-4 h-4" />
+          {t("sidebar.manual_entry_btn")}
+        </button>
 
         <input
           ref={inputRef}
@@ -759,6 +998,17 @@ export default function Sidebar({
           </div>
         )}
       </div>
+
+      {/* Manual entry modal */}
+      {showManualEntry && (
+        <ManualEntryModal
+          onSave={(data) => {
+            onManualEntry(data);
+            setShowManualEntry(false);
+          }}
+          onClose={() => setShowManualEntry(false)}
+        />
+      )}
     </aside>
   );
 }
