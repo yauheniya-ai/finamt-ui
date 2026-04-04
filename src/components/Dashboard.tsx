@@ -6,7 +6,7 @@ import type { Receipt, PeriodFilter, TaxpayerProfile } from "./Sidebar";
 import { CATEGORY_META, fmt, displayName } from "./Sidebar";
 import type { CategoryMeta } from "./Sidebar";
 
-type Props = { receipts: Receipt[]; period: PeriodFilter; taxpayer?: TaxpayerProfile | null; onEditTaxpayer?: () => void };
+type Props = { receipts: Receipt[]; allReceipts: Receipt[]; period: PeriodFilter; taxpayer?: TaxpayerProfile | null; onEditTaxpayer?: () => void };
 
 // ---------------------------------------------------------------------------
 // Stat card
@@ -154,10 +154,9 @@ const MATERIAL_CATS_JAB = new Set(["material", "equipment"]);
 const INCOME_CATS_JAB   = new Set(["services", "consulting", "products", "licensing"]);
 
 type JabSettings = {
-  year:          number;
+  gründungsjahr: number;
   stammkapital:  number;
   eingezahlt:    number;
-  vortrag:       number;
   nettomethode:  boolean;
 };
 
@@ -178,7 +177,7 @@ type JabResult = {
     stammkapital:              number;
     nichtEingefordert:         number;
     jahresergebnis:            number;
-    gewinnvortrag:             number;
+    gewinnvortrag:             number;   // auto-computed from prior years
     summeEigenkapital:         number;
     summePassiva:              number;
     ausgeglichen:              boolean;
@@ -188,21 +187,33 @@ type JabResult = {
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
-function computeJab(allReceipts: Receipt[], s: JabSettings): JabResult {
+function computeJab(allReceipts: Receipt[], s: JabSettings, year: number): JabResult {
+  // Split receipts into prior years (for vortrag + opening cash)
+  // and the reporting year (for GuV).
   let umsatzerlöse = 0, sonstigeBetriebserlöse = 0;
   let materialaufwand = 0, sonstigeBetriebsausgaben = 0;
+  let priorNet = 0; // cumulative net result from Gründungsjahr to year-1
 
   for (const r of allReceipts) {
     if (!r.receipt_date) continue;
-    if (parseInt(r.receipt_date.slice(0, 4), 10) !== s.year) continue;
+    const ry = parseInt(r.receipt_date.slice(0, 4), 10);
+    if (ry < s.gründungsjahr || ry > year) continue;
     const net = r.net_amount ?? ((r.total_amount ?? 0) - (r.vat_amount ?? 0));
     const cat = r.category ?? "other";
-    if (r.receipt_type === "purchase") {
-      if (MATERIAL_CATS_JAB.has(cat)) materialaufwand          += net;
-      else                            sonstigeBetriebsausgaben += net;
+    const isPurchase = r.receipt_type === "purchase";
+
+    if (ry < year) {
+      // Accumulate into Gewinnvortrag and opening-cash carry-forward.
+      priorNet += isPurchase ? -net : net;
     } else {
-      if (INCOME_CATS_JAB.has(cat))   umsatzerlöse             += net;
-      else                            sonstigeBetriebserlöse   += net;
+      // Current reporting year → GuV.
+      if (isPurchase) {
+        if (MATERIAL_CATS_JAB.has(cat)) materialaufwand          += net;
+        else                            sonstigeBetriebsausgaben += net;
+      } else {
+        if (INCOME_CATS_JAB.has(cat))   umsatzerlöse             += net;
+        else                            sonstigeBetriebserlöse   += net;
+      }
     }
   }
 
@@ -210,28 +221,28 @@ function computeJab(allReceipts: Receipt[], s: JabSettings): JabResult {
   sonstigeBetriebserlöse   = r2(sonstigeBetriebserlöse);
   materialaufwand          = r2(materialaufwand);
   sonstigeBetriebsausgaben = r2(sonstigeBetriebsausgaben);
+  priorNet                 = r2(priorNet);
 
   const gesamtleistung = r2(umsatzerlöse + sonstigeBetriebserlöse);
   const gesamtaufwand  = r2(materialaufwand + sonstigeBetriebsausgaben);
   const jahresergebnis = r2(gesamtleistung - gesamtaufwand);
 
-  // Aktiva ----------------------------------------------------------------
-  // Opening cash = paid-in capital (Gründungsjahr model: initial Einlage)
-  // Revenue received − expenses paid on top of that.
-  // Note: vortrag is equity, not cash — do NOT add it here.
-  const kassenbestand = r2(Math.max(s.eingezahlt + gesamtleistung - gesamtaufwand, 0));
-  const ausstehend    = r2(s.stammkapital - s.eingezahlt);
-  const ausstehendeEinlagenAktiva = s.nettomethode ? 0 : ausstehend;
-  const summeAktiva   = r2(kassenbestand + ausstehendeEinlagenAktiva);
+  // Opening cash for the reporting year:
+  //   Capital was injected ONCE in the Gründungsjahr.
+  //   Each subsequent year's opening cash = prior year's closing cash
+  //   = eingezahlt + cumulative net result of all prior years.
+  const openingCash  = r2(s.eingezahlt + priorNet);
+  const kassenbestand = r2(Math.max(openingCash + gesamtleistung - gesamtaufwand, 0));
 
-  // Passiva ---------------------------------------------------------------
-  // Nettomethode (§ 272 I S. 2 HGB): deduct nicht-eingeforderte Einlagen
-  //   from equity → Bilanzsumme = eingezahltes Kapital only.
-  // Bruttomethode (§ 272 I S. 1 HGB): show as Aktiva asset, full Stammkapital
-  //   on Passiva → Bilanzsumme = full Stammkapital.
+  const ausstehend = r2(s.stammkapital - s.eingezahlt);
+  const ausstehendeEinlagenAktiva = s.nettomethode ? 0 : ausstehend;
+  const summeAktiva = r2(kassenbestand + ausstehendeEinlagenAktiva);
+
   const nichtEingefordert = s.nettomethode ? ausstehend : 0;
-  const summeEigenkapital = r2(s.stammkapital - nichtEingefordert + jahresergebnis + s.vortrag);
-  const summePassiva      = summeEigenkapital; // simplified: no Rückstellungen/Verbindlichkeiten
+  // Gewinnvortrag = cumulative result of all years BEFORE the reporting year.
+  const gewinnvortrag     = priorNet;
+  const summeEigenkapital = r2(s.stammkapital - nichtEingefordert + gewinnvortrag + jahresergebnis);
+  const summePassiva      = summeEigenkapital;
 
   const differenz    = r2(summeAktiva - summePassiva);
   const ausgeglichen = Math.abs(differenz) < 0.005;
@@ -244,44 +255,54 @@ function computeJab(allReceipts: Receipt[], s: JabSettings): JabResult {
     bilanz: {
       kassenbestand, ausstehendeEinlagenAktiva, summeAktiva,
       stammkapital: s.stammkapital, nichtEingefordert,
-      jahresergebnis, gewinnvortrag: s.vortrag,
+      jahresergebnis, gewinnvortrag,
       summeEigenkapital, summePassiva, ausgeglichen, differenz,
     },
   };
 }
 
-function JahresabschlussPanel({ receipts }: { receipts: Receipt[] }) {
+function JahresabschlussPanel({ allReceipts, period }: { allReceipts: Receipt[]; period: PeriodFilter }) {
   const { t } = useTranslation();
   const currentYear = new Date().getFullYear();
+
+  // Derive the reporting year from the sidebar period — the user should not enter it manually.
+  const year = period.mode === "all" ? currentYear - 1 : period.year;
+
   const [open, setOpen] = useState(false);
   const [s, setS] = useState<JabSettings>({
-    year:         currentYear - 1,
-    stammkapital: 25000,
-    eingezahlt:   12500,
-    vortrag:      0,
-    nettomethode: true,
+    gründungsjahr: year,
+    stammkapital:  25000,
+    eingezahlt:    12500,
+    nettomethode:  true,
   });
 
-  const jab  = computeJab(receipts, s);
+  // Keep gründungsjahr ≤ year whenever period changes.
+  const gründungsjahr = Math.min(s.gründungsjahr, year);
+
+  const jab  = computeJab(allReceipts, { ...s, gründungsjahr }, year);
   const { guv, bilanz } = jab;
 
   const fE = (n: number) =>
     n.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
   const negFmt = (n: number) => (n < 0 ? `(${fE(Math.abs(n))})` : fE(n));
 
-  const numField = (key: keyof JabSettings, label: string, step = 500) => (
+  const numField = (key: keyof JabSettings, label: string, step = 500, disabled = false) => (
     <label key={key} className="flex flex-col gap-0.5">
       <span className="text-[10px] font-bold uppercase text-black/50">{label}</span>
       <input
         type="number" step={step}
         value={s[key] as number}
+        disabled={disabled}
         onChange={(e) => setS((p) => ({ ...p, [key]: parseFloat(e.target.value) || 0 }))}
-        className="w-full border border-amber-300 rounded px-2 py-1 text-xs font-mono bg-amber-50 focus:outline-none focus:border-black"
+        className={`w-full border border-amber-300 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-black ${
+          disabled ? "bg-black/5 text-black/40 cursor-not-allowed" : "bg-amber-50"
+        }`}
       />
     </label>
   );
 
   const ausstehend = r2(s.stammkapital - s.eingezahlt);
+  const isGründungsjahr = year === gründungsjahr;
 
   return (
     <div className="bg-white border-2 border-amber-400 rounded">
@@ -301,20 +322,33 @@ function JahresabschlussPanel({ receipts }: { receipts: Receipt[] }) {
       {open && (
         <div className="border-t border-amber-200 p-4 flex flex-col gap-5">
 
-          {/* Settings */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          {/* Period badge — shows the year derived from the sidebar */}
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold uppercase text-black/40">{t("dashboard.jab_year")}</span>
+            <span className="text-xs font-black font-mono text-black bg-amber-100 border border-amber-300 rounded px-2 py-0.5">{year}</span>
+            {period.mode === "all" && (
+              <span className="text-[10px] text-black/40 font-mono">← {t("dashboard.jab_year_hint_all")}</span>
+            )}
+          </div>
+
+          {/* Settings — one-time company facts only */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {/* Gründungsjahr — determines when capital was injected; capped to year */}
             <label className="flex flex-col gap-0.5">
-              <span className="text-[10px] font-bold uppercase text-black/50">{t("dashboard.jab_year")}</span>
+              <span className="text-[10px] font-bold uppercase text-black/50">{t("dashboard.jab_gründungsjahr")}</span>
               <input
                 type="number" step={1}
-                value={s.year}
-                onChange={(e) => setS((p) => ({ ...p, year: parseInt(e.target.value, 10) || currentYear - 1 }))}
+                value={s.gründungsjahr}
+                max={year}
+                onChange={(e) => {
+                  const gy = Math.min(parseInt(e.target.value, 10) || year, year);
+                  setS((p) => ({ ...p, gründungsjahr: gy }));
+                }}
                 className="w-full border border-amber-300 rounded px-2 py-1 text-xs font-mono bg-amber-50 focus:outline-none focus:border-black"
               />
             </label>
             {numField("stammkapital", t("dashboard.jab_stammkapital"))}
             {numField("eingezahlt",   t("dashboard.jab_eingezahlt"))}
-            {numField("vortrag",      t("dashboard.jab_vortrag"), 100)}
             <div className="flex flex-col gap-0.5">
               <span className="text-[10px] font-bold uppercase text-black/50">{t("dashboard.jab_method")}</span>
               <div className="flex gap-2 items-center pt-1">
@@ -346,6 +380,14 @@ function JahresabschlussPanel({ receipts }: { receipts: Receipt[] }) {
               {s.nettomethode && (
                 <><br />{t("dashboard.jab_nettomethode_note")}</>
               )}
+            </div>
+          )}
+          {!isGründungsjahr && jab.bilanz.gewinnvortrag !== 0 && (
+            <div className="bg-black/5 border border-black/10 rounded p-2 text-[11px] font-mono text-black/60">
+              {t("dashboard.jab_vortrag_computed", {
+                years: `${gründungsjahr}–${year - 1}`,
+                amount: negFmt(jab.bilanz.gewinnvortrag),
+              })}
             </div>
           )}
 
@@ -496,7 +538,7 @@ function JahresabschlussPanel({ receipts }: { receipts: Receipt[] }) {
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
-export default function Dashboard({ receipts, period, taxpayer, onEditTaxpayer }: Props) {
+export default function Dashboard({ receipts, allReceipts, period, taxpayer, onEditTaxpayer }: Props) {
   const { t } = useTranslation();
 
   // ── Period label ────────────────────────────────────────────────────────
@@ -693,7 +735,7 @@ export default function Dashboard({ receipts, period, taxpayer, onEditTaxpayer }
       </div>
 
       {/* Jahresabschluss */}
-      <JahresabschlussPanel receipts={receipts} />
+      <JahresabschlussPanel allReceipts={allReceipts} period={period} />
 
       {/* Tax return tiles */}
       <div className="grid grid-cols-2 gap-3">

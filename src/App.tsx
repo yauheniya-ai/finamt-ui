@@ -195,6 +195,7 @@ export default function App() {
         />
         <Dashboard
           receipts={visibleReceipts}
+          allReceipts={receipts}
           period={period}
           taxpayer={taxpayer}
           onEditTaxpayer={() => setShowTaxpayerModal(true)}
