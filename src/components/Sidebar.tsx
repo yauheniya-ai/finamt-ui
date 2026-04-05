@@ -395,7 +395,7 @@ export function ManualEntryModal({ onSave, onClose, apiBase, dbPath, initialType
     category:       "other",
     subcategory:    "",
     net_amount:     "",
-    vat_percentage: "19",
+    vat_percentage: "0",
     description:    "",
     currency:       "EUR",
   });

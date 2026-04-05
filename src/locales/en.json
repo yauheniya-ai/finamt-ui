@@ -415,6 +415,7 @@
     "jab_nicht_eingefordert": "not yet called up",
     "jab_jahresergebnis_passiva": "Net result (surplus / deficit)",
     "jab_gewinnvortrag": "Profit / loss carryover",
+    "jab_steuerpositionen": "Tax settlements / cash movements (net)",
     "jab_summe_passiva": "Total Equity & Liabilities",
     "jab_balanced": "Balance sheet balanced: Aktiva = Passiva.",
     "jab_unbalanced": "Imbalance of {{diff}} \u2014 check manually.",

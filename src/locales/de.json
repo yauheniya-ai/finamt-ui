@@ -415,6 +415,7 @@
     "jab_nicht_eingefordert": "davon nicht eingefordert",
     "jab_jahresergebnis_passiva": "Jahres\u00fcberschuss / -fehlbetrag",
     "jab_gewinnvortrag": "Gewinn-/Verlustvortrag",
+    "jab_steuerpositionen": "Steuererstattungen/-zahlungen (netto)",
     "jab_summe_passiva": "Summe Passiva",
     "jab_balanced": "Bilanz ausgeglichen: Aktiva = Passiva.",
     "jab_unbalanced": "Differenz {{diff}} \u2014 bitte manuell pr\u00fcfen.",

@@ -175,6 +175,10 @@ type JabResult = {
     nichtEingefordert:         number;
     jahresergebnis:            number;
     gewinnvortrag:             number;   // auto-computed from prior years
+    /** Net cash from cashflow-only items (tax_settlement, capital_movement)
+     *  in the reporting year.  Positive = net refund / inflow received.
+     *  Shown as a separate Passiva line so the balance sheet stays balanced. */
+    steuerpositionen:          number;
     summeEigenkapital:         number;
     summePassiva:              number;
     ausgeglichen:              boolean;
@@ -197,6 +201,10 @@ function computeJab(
   let umsatzerlöse = 0, sonstigeBetriebserlöse = 0;
   let materialaufwand = 0, sonstigeBetriebsausgaben = 0;
   let priorNet = 0; // cumulative net result from Gründungsjahr to year-1
+  // Net cash from cashflow-only receipts (tax_settlement, capital_movement)
+  // in the reporting year only.  Prior-year cashflow IS folded into priorNet
+  // so that opening-cash and gewinnvortrag stay correct for subsequent years.
+  let cashflowNetCurrent = 0;
 
   for (const r of allReceipts) {
     if (!r.receipt_date) continue;
@@ -205,9 +213,16 @@ function computeJab(
     const net = r.net_amount ?? ((r.total_amount ?? 0) - (r.vat_amount ?? 0));
     const cat = r.category ?? "other";
     const isPurchase = r.receipt_type === "purchase";
+    const cashImpact = isPurchase ? -net : net;
 
-    // Balance-sheet items: skip from P&L entirely (cash is tracked elsewhere)
-    if (CASHFLOW_ONLY_CATS.has(cat)) continue;
+    // Cashflow-only items (tax settlements, capital movements):
+    // — excluded from GuV entirely
+    // — their cash impact is tracked separately so it reaches the bank balance
+    if (CASHFLOW_ONLY_CATS.has(cat)) {
+      if (ry < year) priorNet += cashImpact; // carry into opening cash of next year
+      else           cashflowNetCurrent += cashImpact;
+      continue;
+    }
 
     if (ry < year) {
       // Accumulate into Gewinnvortrag and opening-cash carry-forward.
@@ -229,6 +244,7 @@ function computeJab(
   materialaufwand          = r2(materialaufwand);
   sonstigeBetriebsausgaben = r2(sonstigeBetriebsausgaben);
   priorNet                 = r2(priorNet);
+  cashflowNetCurrent       = r2(cashflowNetCurrent);
 
   const gesamtleistung = r2(umsatzerlöse + sonstigeBetriebserlöse);
   const gesamtaufwand  = r2(materialaufwand + sonstigeBetriebsausgaben);
@@ -237,19 +253,25 @@ function computeJab(
   // Opening cash for the reporting year:
   //   Capital was injected ONCE in the Gründungsjahr.
   //   Each subsequent year's opening cash = prior year's closing cash
-  //   = eingezahlt + cumulative net result of all prior years.
+  //   = eingezahlt + cumulative net result of all prior years
+  //     (priorNet now also contains prior-year cashflow-only flows).
   const openingCash  = r2(eingezahlt + priorNet);
-  const kassenbestand = r2(Math.max(openingCash + gesamtleistung - gesamtaufwand, 0));
+  // kassenbestand: P&L flows + cashflow-only flows (refunds/payments to Finanzamt etc.)
+  const kassenbestand = r2(Math.max(openingCash + gesamtleistung - gesamtaufwand + cashflowNetCurrent, 0));
 
   const ausstehend = r2(stammkapital - eingezahlt);
   const ausstehendeEinlagenAktiva = nettomethode ? 0 : ausstehend;
   const summeAktiva = r2(kassenbestand + ausstehendeEinlagenAktiva);
 
   const nichtEingefordert = nettomethode ? ausstehend : 0;
-  // Gewinnvortrag = cumulative result of all years BEFORE the reporting year.
+  // Gewinnvortrag = cumulative result of all years BEFORE the reporting year
+  // (includes prior cashflow-only items so it mirrors the actual opening cash).
   const gewinnvortrag     = priorNet;
   const summeEigenkapital = r2(stammkapital - nichtEingefordert + gewinnvortrag + jahresergebnis);
-  const summePassiva      = summeEigenkapital;
+  // cashflow-only items of the reporting year appear here as a dedicated Passiva position
+  // so the balance sheet stays balanced without distorting the GuV.
+  const steuerpositionen  = cashflowNetCurrent;
+  const summePassiva      = r2(summeEigenkapital + steuerpositionen);
 
   const differenz    = r2(summeAktiva - summePassiva);
   const ausgeglichen = Math.abs(differenz) < 0.005;
@@ -262,7 +284,7 @@ function computeJab(
     bilanz: {
       kassenbestand, ausstehendeEinlagenAktiva, summeAktiva,
       stammkapital, nichtEingefordert,
-      jahresergebnis, gewinnvortrag,
+      jahresergebnis, gewinnvortrag, steuerpositionen,
       summeEigenkapital, summePassiva, ausgeglichen, differenz,
     },
   };
@@ -511,6 +533,16 @@ function JahresabschlussPanel({ allReceipts, period, taxpayer, onEditTaxpayer }:
                         <td className="py-1 pl-3 text-black/70">IV. {t("dashboard.jab_gewinnvortrag")}</td>
                         <td className={`py-1 text-right ${bilanz.gewinnvortrag < 0 ? "text-red-700" : ""}`}>
                           {negFmt(bilanz.gewinnvortrag)}
+                        </td>
+                      </tr>
+                    )}
+                    {bilanz.steuerpositionen !== 0 && (
+                      <tr className="border-b border-amber-100">
+                        <td className="py-1 text-black/70">
+                          B. {t("dashboard.jab_steuerpositionen")}
+                        </td>
+                        <td className={`py-1 text-right ${bilanz.steuerpositionen < 0 ? "text-red-700" : ""}`}>
+                          {negFmt(bilanz.steuerpositionen)}
                         </td>
                       </tr>
                     )}
