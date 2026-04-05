@@ -549,17 +549,18 @@ function UStVAPanel({ receipts }: { receipts: Receipt[] }) {
 
   const purchases   = receipts.filter((r) => r.receipt_type === "purchase");
   const sales       = receipts.filter((r) => r.receipt_type === "sale");
-  const inputVat    = purchases.reduce((s, r) => s + (r.vat_amount ?? 0), 0);
-  const outputVat   = sales.reduce((s, r) => s + (r.vat_amount ?? 0), 0);
+  const inputVat    = purchases.reduce((s, r) => s + (r.business_vat ?? r.vat_amount ?? 0), 0);
+  const outputVat   = sales.reduce((s, r) => s + (r.business_vat ?? r.vat_amount ?? 0), 0);
   const netLiability = outputVat - inputVat;
 
   const salesByRate = sales.reduce<Record<string, { net: number; vat: number }>>((acc, r) => {
     if (r.vat_percentage == null) return acc;
     const key = String(r.vat_percentage);
     if (!acc[key]) acc[key] = { net: 0, vat: 0 };
-    const net = r.net_amount ?? ((r.total_amount ?? 0) - (r.vat_amount ?? 0));
+    const net = r.business_net ?? r.net_amount ?? ((r.total_amount ?? 0) / (1 + (r.vat_percentage ?? 0) / 100));
+    const vat = r.business_vat ?? r.vat_amount ?? ((r.total_amount ?? 0) - net);
     acc[key].net += net;
-    acc[key].vat += r.vat_amount ?? 0;
+    acc[key].vat += vat;
     return acc;
   }, {});
 
@@ -655,17 +656,18 @@ function UStErkPanel({ allReceipts, period }: { allReceipts: Receipt[]; period: 
 
   const purchases    = yearReceipts.filter((r) => r.receipt_type === "purchase");
   const sales        = yearReceipts.filter((r) => r.receipt_type === "sale");
-  const inputVat     = purchases.reduce((s, r) => s + (r.vat_amount ?? 0), 0);
-  const outputVat    = sales.reduce((s, r) => s + (r.vat_amount ?? 0), 0);
+  const inputVat     = purchases.reduce((s, r) => s + (r.business_vat ?? r.vat_amount ?? 0), 0);
+  const outputVat    = sales.reduce((s, r) => s + (r.business_vat ?? r.vat_amount ?? 0), 0);
   const netLiability = outputVat - inputVat;
 
   const salesByRate = sales.reduce<Record<string, { net: number; vat: number }>>((acc, r) => {
     if (r.vat_percentage == null) return acc;
     const key = String(r.vat_percentage);
     if (!acc[key]) acc[key] = { net: 0, vat: 0 };
-    const net = r.net_amount ?? ((r.total_amount ?? 0) - (r.vat_amount ?? 0));
+    const net = r.business_net ?? r.net_amount ?? ((r.total_amount ?? 0) / (1 + (r.vat_percentage ?? 0) / 100));
+    const vat = r.business_vat ?? r.vat_amount ?? ((r.total_amount ?? 0) - net);
     acc[key].net += net;
-    acc[key].vat += r.vat_amount ?? 0;
+    acc[key].vat += vat;
     return acc;
   }, {});
 
@@ -899,8 +901,8 @@ export default function Dashboard({ receipts, allReceipts, period, taxpayer, onE
 
   const totalExpenses = purchases.reduce((s, r) => s + (r.total_amount ?? 0), 0);
   const totalRevenue  = sales.reduce((s, r) => s + (r.total_amount ?? 0), 0);
-  const inputVat      = purchases.reduce((s, r) => s + (r.vat_amount ?? 0), 0);
-  const outputVat     = sales.reduce((s, r) => s + (r.vat_amount ?? 0), 0);
+  const inputVat      = purchases.reduce((s, r) => s + (r.business_vat ?? r.vat_amount ?? 0), 0);
+  const outputVat     = sales.reduce((s, r) => s + (r.business_vat ?? r.vat_amount ?? 0), 0);
   const netLiability  = outputVat - inputVat;
 
   const revenueTotals = sales.reduce<Record<string, number>>((acc, r) => {
