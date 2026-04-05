@@ -346,6 +346,17 @@
     "gewst_no_liability": "Gewerbeertrag ≤ 0 — keine Gewerbesteuerpflicht für diesen Zeitraum.",
     "gewst_disclaimer": "Gewerbesteuererklärung (§ 14 GewStG): Für GmbH / Kapitalgesellschaft gilt kein Freibetrag. Der Gewerbeertrag wird geschätzt aus dem Jahresüberschuss der Belege. Hinzurechnungen (§ 8) und Kürzungen (§ 9) müssen manuell berücksichtigt werden. Abgabe über ELSTER.",
 
+    "kst_title": "Körperschaftsteuererklärung (KSt 1)",
+    "kst_subtitle": "Jahreserklärung · § 31 KStG · Formular KSt 1 · {{year}}",
+    "kst_zve": "Zu versteuerndes Einkommen (annähernd aus Belegen)",
+    "kst_rate": "Körperschaftsteuersatz",
+    "kst_kst": "Körperschaftsteuer",
+    "kst_solz": "Solidaritätszuschlag",
+    "kst_solz_rate": "{{pct}} % der KSt",
+    "kst_total": "Gesamtbelastung (KSt + SolZ)",
+    "kst_no_liability": "Zu versteuerndes Einkommen ≤ 0 — keine Körperschaftsteuerpflicht für diesen Zeitraum.",
+    "kst_disclaimer": "Körperschaftsteuererklärung (§ 31 KStG, Formular KSt 1): Einheitlicher Steuersatz 15 % (§ 23 KStG) für GmbH / AG. Das zu versteuernde Einkommen wird aus den Nettowerten der Belege dieses Projekts geschätzt. Nichtabziehbare Ausgaben (§ 10 KStG), Verlustvorträge (§ 10d EStG) und sonstige Korrekturen sind manuell vorzunehmen. Solidaritätszuschlag 5,5 % der Körperschaftsteuer. Abgabe über ELSTER.",
+
     "uste_title": "Umsatzsteuererklärung",
     "uste_subtitle": "Jahreserklärung · §18 UStG · {{year}}",
     "uste_col_section": "Umsatzsteuererklärung",
