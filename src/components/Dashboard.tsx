@@ -3,7 +3,7 @@ import { Icon } from "@iconify/react";
 import { IconChevronDown } from "../constants/icons";
 import { useTranslation } from "react-i18next";
 import type { Receipt, PeriodFilter, TaxpayerProfile } from "./Sidebar";
-import { CATEGORY_META, fmt, displayName } from "./Sidebar";
+import { CATEGORY_META, CASHFLOW_ONLY_CATS, fmt, displayName } from "./Sidebar";
 import type { CategoryMeta } from "./Sidebar";
 
 type Props = { receipts: Receipt[]; allReceipts: Receipt[]; period: PeriodFilter; taxpayer?: TaxpayerProfile | null; onEditTaxpayer?: () => void };
@@ -205,6 +205,9 @@ function computeJab(
     const net = r.net_amount ?? ((r.total_amount ?? 0) - (r.vat_amount ?? 0));
     const cat = r.category ?? "other";
     const isPurchase = r.receipt_type === "purchase";
+
+    // Balance-sheet items: skip from P&L entirely (cash is tracked elsewhere)
+    if (CASHFLOW_ONLY_CATS.has(cat)) continue;
 
     if (ry < year) {
       // Accumulate into Gewinnvortrag and opening-cash carry-forward.
@@ -797,6 +800,8 @@ function computeGewerbeertrag(allReceipts: Receipt[], year: number): number {
     if (!r.receipt_date) continue;
     const ry = parseInt(r.receipt_date.slice(0, 4), 10);
     if (ry !== year) continue;
+    // Exclude cashflow-only categories from trade-tax base (§ 7 GewStG)
+    if (CASHFLOW_ONLY_CATS.has(r.category ?? "other")) continue;
     const net = r.net_amount ?? ((r.total_amount ?? 0) - (r.vat_amount ?? 0));
     if (r.receipt_type === "purchase") expenses += net;
     else revenue += net;
@@ -921,10 +926,10 @@ function KStPanel({ allReceipts, period }: { allReceipts: Receipt[]; period: Per
   const year         = period.mode === "all" ? currentYear - 1 : period.year;
   const yearReceipts = allReceipts.filter((r) => r.receipt_date?.startsWith(String(year)));
 
-  const purchases = yearReceipts.filter((r) => r.receipt_type === "purchase");
-  const sales     = yearReceipts.filter((r) => r.receipt_type === "sale");
+  const purchases = yearReceipts.filter((r) => r.receipt_type === "purchase" && !CASHFLOW_ONLY_CATS.has(r.category));
+  const sales     = yearReceipts.filter((r) => r.receipt_type === "sale"     && !CASHFLOW_ONLY_CATS.has(r.category));
 
-  // Net income = revenue net − expenses net
+  // Net income = revenue net − expenses net (cashflow-only categories excluded)
   const revenueNet  = sales.reduce((s, r) => {
     const net = r.business_net ?? r.net_amount ?? ((r.total_amount ?? 0) / (1 + (r.vat_percentage ?? 19) / 100));
     return s + net;
@@ -1028,13 +1033,17 @@ export default function Dashboard({ receipts, allReceipts, period, taxpayer, onE
     ? t("dashboard.period_quarter", { quarter: period.quarter, year: period.year })
     : t("dashboard.period_month", { month: monthNames[period.month - 1], year: period.year });
 
-  const purchases    = receipts.filter((r) => r.receipt_type === "purchase");
-  const sales        = receipts.filter((r) => r.receipt_type === "sale");
+  // All purchases/sales for VAT (includes cashflow-only — VAT is transaction-level)
+  const allPurchases = receipts.filter((r) => r.receipt_type === "purchase");
+  const allSales     = receipts.filter((r) => r.receipt_type === "sale");
+  // P&L-only (cashflow categories excluded from Revenue/Expense stat cards + charts)
+  const purchases = allPurchases.filter((r) => !CASHFLOW_ONLY_CATS.has(r.category));
+  const sales     = allSales.filter((r) => !CASHFLOW_ONLY_CATS.has(r.category));
 
   const totalExpenses = purchases.reduce((s, r) => s + (r.total_amount ?? 0), 0);
   const totalRevenue  = sales.reduce((s, r) => s + (r.total_amount ?? 0), 0);
-  const inputVat      = purchases.reduce((s, r) => s + (r.business_vat ?? r.vat_amount ?? 0), 0);
-  const outputVat     = sales.reduce((s, r) => s + (r.business_vat ?? r.vat_amount ?? 0), 0);
+  const inputVat      = allPurchases.reduce((s, r) => s + (r.business_vat ?? r.vat_amount ?? 0), 0);
+  const outputVat     = allSales.reduce((s, r) => s + (r.business_vat ?? r.vat_amount ?? 0), 0);
   const netLiability  = outputVat - inputVat;
 
   const revenueTotals = sales.reduce<Record<string, number>>((acc, r) => {

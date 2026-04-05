@@ -4,7 +4,7 @@ import { IconChevronDown, IconClose, IconDelete, IconPlusCircle, IconSpinner } f
 import type { Receipt, ReceiptItem } from "./Sidebar";
 import { fmt, CATEGORY_META } from "./Sidebar";
 import type { CategoryMeta } from "./Sidebar";
-import { CATEGORY_SUBCATEGORIES } from "../constants";
+import { CATEGORY_SUBCATEGORIES, CASHFLOW_ONLY_CATS } from "../constants";
 import { useTranslation } from "react-i18next";
 import i18n from "../i18n";
 
@@ -107,18 +107,33 @@ function CategorySelect({ value, onChange }: { value: string; onChange: (v: stri
             className="absolute z-30 mt-1 w-full bg-white border border-amber-300 rounded shadow-lg max-h-56 overflow-y-auto"
             onMouseLeave={() => setOpen(false)}
           >
-            {(Object.entries(CATEGORY_META) as [string, CategoryMeta][]).map(([k, v]) => (
-              <li key={k}>
-                <button
-                  type="button"
-                  onClick={() => { onChange(k); setOpen(false); }}
-                  className={`w-full flex items-center gap-2 px-2 py-1.5 text-xs font-mono text-left hover:bg-amber-50 transition-colors ${k === value ? "bg-amber-100 font-bold" : ""}`}
-                >
-                  <Icon icon={v.icon} className="shrink-0 text-base" />
-                  <span>{t(`sidebar.categories.${k}`, { defaultValue: v.label })}</span>
-                </button>
-              </li>
-            ))}
+            {(Object.entries(CATEGORY_META) as [string, CategoryMeta][]).flatMap(([k, v], idx, arr) => {
+              const prevKey = idx > 0 ? arr[idx - 1][0] : null;
+              const needsDivider = CASHFLOW_ONLY_CATS.has(k) && !CASHFLOW_ONLY_CATS.has(prevKey ?? "");
+              const items = [];
+              if (needsDivider) {
+                items.push(
+                  <li key={`${k}-divider`} className="px-2 pt-1.5 pb-0.5 border-t border-amber-200">
+                    <span className="text-[9px] font-black uppercase tracking-wider text-black/40">
+                      {t("sidebar.cashflow_only_label", { defaultValue: "Nur Cashflow" })}
+                    </span>
+                  </li>
+                );
+              }
+              items.push(
+                <li key={k}>
+                  <button
+                    type="button"
+                    onClick={() => { onChange(k); setOpen(false); }}
+                    className={`w-full flex items-center gap-2 px-2 py-1.5 text-xs font-mono text-left hover:bg-amber-50 transition-colors ${k === value ? "bg-amber-100 font-bold" : ""}`}
+                  >
+                    <Icon icon={v.icon} className="shrink-0 text-base" />
+                    <span>{t(`sidebar.categories.${k}`, { defaultValue: v.label })}</span>
+                  </button>
+                </li>
+              );
+              return items;
+            })}
           </ul>
         )}
       </div>

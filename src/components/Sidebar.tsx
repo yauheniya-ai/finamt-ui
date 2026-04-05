@@ -1,8 +1,9 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import i18n from "../i18n";
 import { Icon } from "@iconify/react";
-import { CATEGORY_META } from "../constants";
+import { CATEGORY_META, CASHFLOW_ONLY_CATS } from "../constants";
+import type { CategoryMeta } from "../constants";
 import { IconChevronDown, IconDelete, IconSpinner } from "../constants/icons";
 
 // ---------------------------------------------------------------------------
@@ -54,7 +55,7 @@ export type ReceiptItem = {
   category:    string;
 };
 
-export { CATEGORY_META } from "../constants";
+export { CATEGORY_META, CASHFLOW_ONLY_CATS } from "../constants";
 export type { CategoryMeta } from "../constants";
 
 export type Receipt = {
@@ -364,6 +365,8 @@ export function TaxpayerModal({ initial, onSave, onClear, onClose }: {
 // Manual entry modal
 // ---------------------------------------------------------------------------
 
+type VerifiedCpEntry = { id: string; name: string | null; vat_id: string | null; tax_number: string | null };
+
 export type ManualEntryForm = {
   date:           string;
   vendor:         string;
@@ -375,35 +378,80 @@ export type ManualEntryForm = {
   currency:       string;
 };
 
-export function ManualEntryModal({ onSave, onClose }: {
-  onSave:  (data: ManualEntryForm) => void;
-  onClose: () => void;
+export function ManualEntryModal({ onSave, onClose, apiBase, dbPath, initialType }: {
+  onSave:      (data: ManualEntryForm) => void;
+  onClose:     () => void;
+  apiBase:     string;
+  dbPath?:     string | null;
+  initialType: "purchase" | "sale";
 }) {
   const { t } = useTranslation();
-  const [form, setForm] = useState<ManualEntryForm>({
+  const initialForm = useRef<ManualEntryForm>({
     date:           new Date().toISOString().slice(0, 10),
     vendor:         "",
-    receipt_type:   "purchase",
+    receipt_type:   initialType,
     category:       "other",
     net_amount:     "",
     vat_percentage: "19",
     description:    "",
     currency:       "EUR",
   });
+  const [form, setForm] = useState<ManualEntryForm>(initialForm.current);
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+
+  const isDirty = (Object.keys(form) as (keyof ManualEntryForm)[])
+    .some((k) => form[k] !== initialForm.current[k]);
+
+  const handleCloseRequest = () => {
+    if (isDirty) setShowCloseConfirm(true);
+    else onClose();
+  };
+
   const set = (key: keyof ManualEntryForm) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
       setForm((prev) => ({ ...prev, [key]: e.target.value }));
+
+  // Category dropdown
+  const [showCatDropdown, setShowCatDropdown] = useState(false);
+
+  // Verified counterparty picker
+  const [showCpPicker, setShowCpPicker] = useState(false);
+  const [cpList,       setCpList]       = useState<VerifiedCpEntry[]>([]);
+  const [cpLoading,    setCpLoading]    = useState(false);
+  const [cpQuery,      setCpQuery]      = useState("");
+
+  useEffect(() => {
+    if (!showCpPicker) return;
+    setCpLoading(true);
+    const dbQs = dbPath ? `?db=${encodeURIComponent(dbPath)}` : "";
+    fetch(`${apiBase}/counterparties/verified${dbQs}`)
+      .then((r) => r.json())
+      .then((d) => {
+        const raw = (d.counterparties ?? []) as VerifiedCpEntry[];
+        raw.sort((a, b) => (a.name ?? "").localeCompare(b.name ?? "", undefined, { sensitivity: "base" }));
+        setCpList(raw);
+      })
+      .catch(() => {})
+      .finally(() => setCpLoading(false));
+  }, [showCpPicker, apiBase, dbPath]);
+
+  const filteredCps = cpQuery.trim()
+    ? cpList.filter((cp) => {
+        const q = cpQuery.toLowerCase();
+        return (cp.name ?? "").toLowerCase().includes(q)
+          || (cp.vat_id ?? "").toLowerCase().includes(q)
+          || (cp.tax_number ?? "").toLowerCase().includes(q);
+      })
+    : cpList;
 
   const inputCls = "border border-black/20 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-amber-400 w-full";
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-      onClick={onClose}
     >
       <div
         className="bg-white border-2 border-amber-400 rounded p-5 w-80 flex flex-col gap-3 shadow-xl max-h-[90vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
       >
         <h4 className="text-black text-sm font-black uppercase tracking-wider">
           {t("sidebar.manual_entry_title")}
@@ -446,19 +494,111 @@ export function ManualEntryModal({ onSave, onClose }: {
             {t("sidebar.manual_entry_vendor")}
           </label>
           <input type="text" value={form.vendor} onChange={set("vendor")} className={inputCls}
-            placeholder="e.g. Finanzamt Berlin" />
+            placeholder="z. B. Finanzamt Berlin" />
+          {/* Verified counterparty picker */}
+          <div>
+            <button
+              type="button"
+              onClick={() => { setShowCpPicker((o) => !o); setCpQuery(""); }}
+              className="flex items-center gap-1 text-[10px] font-bold text-black/40 hover:text-black uppercase tracking-wider transition-colors mt-0.5"
+            >
+              <Icon icon="mdi:account-check-outline" className="w-3.5 h-3.5" />
+              {t("sidebar.manual_entry_select_verified", { defaultValue: "Aus verifizierten wählen" })}
+              <Icon icon={showCpPicker ? "mdi:chevron-up" : "mdi:chevron-down"} className="w-3 h-3" />
+            </button>
+            {showCpPicker && (
+              <div className="mt-1 border border-black/10 rounded overflow-hidden">
+                <div className="px-2 py-1.5 border-b border-black/10">
+                  <input
+                    autoFocus
+                    value={cpQuery}
+                    onChange={(e) => setCpQuery(e.target.value)}
+                    placeholder={t("preview.search_counterparty", { defaultValue: "Suchen…" })}
+                    className="w-full text-xs font-mono bg-white border border-black/15 rounded px-2 py-1 outline-none focus:border-amber-400 placeholder:text-black/25"
+                  />
+                </div>
+                {cpLoading ? (
+                  <div className="px-3 py-2 text-xs text-black/30 font-mono">{t("sidebar.processing")}</div>
+                ) : filteredCps.length === 0 ? (
+                  <div className="px-3 py-2 text-xs text-black/30 font-mono">
+                    {cpList.length === 0
+                      ? t("preview.no_verified_counterparties")
+                      : t("preview.no_results", { defaultValue: "Keine Treffer" })}
+                  </div>
+                ) : filteredCps.map((cp) => (
+                  <button
+                    key={cp.id}
+                    type="button"
+                    onClick={() => {
+                      setForm((p) => ({ ...p, vendor: cp.name ?? "" }));
+                      setShowCpPicker(false);
+                      setCpQuery("");
+                    }}
+                    className="w-full text-left px-3 py-2 hover:bg-amber-50 border-b border-black/5 last:border-0 transition-colors"
+                  >
+                    <div className="text-xs font-bold text-black">{cp.name ?? "—"}</div>
+                    <div className="text-[10px] text-black/40 font-mono">{cp.vat_id ?? cp.tax_number ?? ""}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Category */}
+        {/* Category — custom dropdown with cashflow divider */}
         <div className="flex flex-col gap-1">
           <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider">
             {t("sidebar.manual_entry_category")}
           </label>
-          <select value={form.category} onChange={set("category")} className={inputCls}>
-            {Object.keys(CATEGORY_META).map((k) => (
-              <option key={k} value={k}>{t(`sidebar.categories.${k}`, k)}</option>
-            ))}
-          </select>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowCatDropdown((o) => !o)}
+              className={`${inputCls} flex items-center gap-1.5 text-left cursor-pointer`}
+            >
+              {CATEGORY_META[form.category] && (
+                <Icon icon={CATEGORY_META[form.category].icon} className="shrink-0 text-base" />
+              )}
+              <span className="flex-1 truncate">
+                {t(`sidebar.categories.${form.category}`, { defaultValue: form.category })}
+              </span>
+              <IconChevronDown className={`shrink-0 text-sm transition-transform ${showCatDropdown ? "rotate-180" : ""}`} />
+            </button>
+            {showCatDropdown && (
+              <ul
+                className="absolute z-30 mt-1 w-full bg-white border border-amber-300 rounded shadow-lg max-h-56 overflow-y-auto"
+                onMouseLeave={() => setShowCatDropdown(false)}
+              >
+                {(Object.entries(CATEGORY_META) as [string, CategoryMeta][]).flatMap(([k, v], idx, arr) => {
+                  const prevKey = idx > 0 ? arr[idx - 1][0] : null;
+                  const needsDivider = CASHFLOW_ONLY_CATS.has(k) && !CASHFLOW_ONLY_CATS.has(prevKey ?? "");
+                  const items = [];
+                  if (needsDivider) {
+                    items.push(
+                      <li key={`${k}-divider`} className="px-2 pt-1.5 pb-0.5 border-t border-amber-200">
+                        <span className="text-[9px] font-black uppercase tracking-wider text-black/40">
+                          {t("sidebar.cashflow_only_label", { defaultValue: "Nur Cashflow" })}
+                        </span>
+                      </li>
+                    );
+                  }
+                  items.push(
+                    <li key={k}>
+                      <button
+                        type="button"
+                        onClick={() => { setForm((p) => ({ ...p, category: k })); setShowCatDropdown(false); }}
+                        className={`w-full flex items-center gap-2 px-2 py-1.5 text-xs font-mono text-left hover:bg-amber-50 transition-colors ${k === form.category ? "bg-amber-100 font-bold" : ""}`}
+                      >
+                        <Icon icon={v.icon} className="shrink-0 text-base" />
+                        <span>{t(`sidebar.categories.${k}`, { defaultValue: v.label })}</span>
+                      </button>
+                    </li>
+                  );
+                  return items;
+                })}
+              </ul>
+            )}
+          </div>
         </div>
 
         {/* Net amount + VAT */}
@@ -467,8 +607,8 @@ export function ManualEntryModal({ onSave, onClose }: {
             <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider">
               {t("sidebar.manual_entry_net")}
             </label>
-            <input type="number" value={form.net_amount} onChange={set("net_amount")}
-              className={inputCls} placeholder="0.00" min={0} step={0.01} />
+            <input type="text" inputMode="decimal" value={form.net_amount} onChange={set("net_amount")}
+              className={inputCls} placeholder="0,00" />
           </div>
           <div className="flex flex-col gap-1 w-24">
             <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider">
@@ -490,8 +630,31 @@ export function ManualEntryModal({ onSave, onClose }: {
           <textarea value={form.description} onChange={set("description")}
             rows={2}
             className="border border-black/20 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-amber-400 w-full resize-none"
-            placeholder="e.g. VAT refund Q1 2024" />
+            placeholder={t("sidebar.manual_entry_notes_placeholder", { defaultValue: "z. B. USt-Erstattung Q1 2024" })} />
         </div>
+
+        {/* Close confirmation strip */}
+        {showCloseConfirm && (
+          <div className="flex flex-col gap-2 bg-red-50 border border-red-200 rounded px-3 py-2">
+            <p className="text-xs font-bold text-black leading-snug">
+              {t("sidebar.manual_entry_discard_confirm", { defaultValue: "Nicht gespeicherte Daten verwerfen und schließen?" })}
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={onClose}
+                className="flex-1 bg-red-500 hover:bg-red-600 text-white text-xs font-bold py-1 rounded transition-colors"
+              >
+                {t("sidebar.manual_entry_discard", { defaultValue: "Verwerfen & Schließen" })}
+              </button>
+              <button
+                onClick={() => setShowCloseConfirm(false)}
+                className="flex-1 bg-white border border-black/15 hover:bg-amber-50 text-black text-xs font-bold py-1 rounded transition-colors"
+              >
+                {t("sidebar.manual_entry_keep_editing", { defaultValue: "Weiter bearbeiten" })}
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="flex gap-2 mt-1">
           <button
@@ -501,7 +664,7 @@ export function ManualEntryModal({ onSave, onClose }: {
             {t("sidebar.manual_entry_save")}
           </button>
           <button
-            onClick={onClose}
+            onClick={handleCloseRequest}
             className="bg-amber-50 hover:bg-amber-100 text-black text-xs font-bold py-1.5 px-3 rounded transition-colors"
           >
             {t("sidebar.taxpayer_close")}
@@ -566,6 +729,8 @@ type Props = {
   onPeriodChange:   (p: PeriodFilter) => void;
   taxpayer:         TaxpayerProfile | null;
   onEditTaxpayer:   () => void;
+  apiBase:          string;
+  dbPath?:          string | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -741,12 +906,13 @@ function SectionDivider({ label, count, total, isRevenue, isOpen, onToggle }: { 
 
 export default function Sidebar({
   receipts, selectedId, onSelect, onUpload, onManualEntry, onDelete, uploading, progressStep, onCancelUpload, error,
-  period, onPeriodChange, taxpayer, onEditTaxpayer,
+  period, onPeriodChange, taxpayer, onEditTaxpayer, apiBase, dbPath,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [collapsed,       setCollapsed]       = useState<Set<string>>(new Set());
   const [revenueOpen,     setRevenueOpen]     = useState(true);
   const [expensesOpen,    setExpensesOpen]    = useState(true);
+  const [cashflowOpen,    setCashflowOpen]    = useState(true);
   const { t } = useTranslation();
   const [uploadType,      setUploadType]      = useState<"purchase" | "sale">("purchase");
   const [confirmingId,    setConfirmingId]    = useState<string | null>(null);
@@ -780,13 +946,25 @@ export default function Sidebar({
   };
 
   // Counts + totals for section headers
-  const purchases = receipts.filter((r) => r.receipt_type === "purchase");
-  const sales      = receipts.filter((r) => r.receipt_type === "sale");
+  // Cashflow-only categories (tax settlements, capital movements) are shown
+  // in a separate section and excluded from Revenue/Expense P&L totals.
+  const purchases = receipts.filter((r) => r.receipt_type === "purchase" && !CASHFLOW_ONLY_CATS.has(r.category));
+  const sales      = receipts.filter((r) => r.receipt_type === "sale"     && !CASHFLOW_ONLY_CATS.has(r.category));
   const purchaseTotal = purchases.reduce((s, r) => s + (r.total_amount ?? 0), 0);
   const saleTotal     = sales.reduce((s, r) => s + (r.total_amount ?? 0), 0);
 
-  // Category entries preserving CATEGORY_META order
-  const allCats = Object.entries(CATEGORY_META);
+  const cashflowReceipts = receipts.filter((r) => CASHFLOW_ONLY_CATS.has(r.category));
+  const cashflowTotal    = cashflowReceipts.reduce((s, r) => {
+    const signed = r.receipt_type === "sale" ? (r.total_amount ?? 0) : -(r.total_amount ?? 0);
+    return s + signed;
+  }, 0);
+
+  // Category lists for the three sections
+  const plCats       = Object.entries(CATEGORY_META).filter(([cat]) => !CASHFLOW_ONLY_CATS.has(cat));
+  const cashflowCats = Object.entries(CATEGORY_META).filter(([cat]) =>  CASHFLOW_ONLY_CATS.has(cat));
+
+  // Category entries preserving CATEGORY_META order (P&L categories only)
+  const allCats = plCats;
 
   const renderGroup = (cat: string, meta: { label: string; icon: string }, type: "purchase" | "sale") => {
     const items = (grouped[cat] ?? [])
@@ -1007,6 +1185,26 @@ export default function Sidebar({
           </>
         )}
 
+        {/* Cashflow-only section (tax settlements + capital movements) */}
+        {cashflowReceipts.length > 0 && (
+          <>
+            <SectionDivider
+              label={t("sidebar.cashflow_section", { defaultValue: "Cashflow" })}
+              count={cashflowReceipts.length}
+              total={cashflowTotal}
+              isRevenue={false}
+              isOpen={cashflowOpen}
+              onToggle={() => setCashflowOpen((v) => !v)}
+            />
+            {cashflowOpen && cashflowCats.map(([cat, meta]) => (
+              <div key={cat}>
+                {renderGroup(cat, meta, "sale")}
+                {renderGroup(cat, meta, "purchase")}
+              </div>
+            ))}
+          </>
+        )}
+
         {receipts.length === 0 && (
           <div className="flex flex-col items-center justify-center gap-3 p-8 text-center">
             <Icon icon="mdi:receipt-text-outline" className="w-10 h-10 text-black/20" />
@@ -1025,6 +1223,9 @@ export default function Sidebar({
             setShowManualEntry(false);
           }}
           onClose={() => setShowManualEntry(false)}
+          apiBase={apiBase}
+          dbPath={dbPath}
+          initialType={uploadType}
         />
       )}
     </aside>

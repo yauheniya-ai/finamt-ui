@@ -25,6 +25,8 @@ export const CATEGORY_META: Record<string, CategoryMeta> = {
   marketing:         { label: "marketing",         icon: "mdi:loudspeaker" },  
   donations:         { label: "donations",         icon: "mdi:donation" },
   other:             { label: "other",             icon: "flowbite:folder-plus-solid" },
+  tax_settlement:    { label: "tax_settlement",    icon: "mdi:bank-transfer" },
+  capital_movement:  { label: "capital_movement",  icon: "mdi:wallet-plus" },
 };
 
 export const CATEGORY_SUBCATEGORIES: Record<string, string[]> = {
@@ -153,4 +155,25 @@ export const CATEGORY_SUBCATEGORIES: Record<string, string[]> = {
     "sundry",
   ],
 
+  tax_settlement: [
+    "vat_refund",
+    "vat_payment",
+    "income_tax",
+    "trade_tax",
+    "other_tax",
+  ],
+
+  capital_movement: [
+    "owner_equity",
+    "shareholder_loan",
+    "withdrawal",
+  ],
+
 };
+
+/**
+ * Categories that represent pure cash-flow events (balance-sheet items).
+ * They are excluded from P&L (GuV) and stat-card Revenue/Expense totals.
+ * VAT is still tracked per transaction and flows into VAT returns normally.
+ */
+export const CASHFLOW_ONLY_CATS = new Set<string>(["tax_settlement", "capital_movement"]);
