@@ -160,6 +160,7 @@ export default function App() {
         vendor:         entry.vendor || null,
         receipt_type:   entry.receipt_type,
         category:       entry.category,
+        subcategory:    entry.subcategory || null,
         net_amount:     parseFloat(entry.net_amount.replace(",", ".")) || 0,
         vat_percentage: parseFloat(entry.vat_percentage.replace(",", ".")) || 0,
         description:    entry.description || null,

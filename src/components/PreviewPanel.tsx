@@ -921,6 +921,7 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
     receipt_number: "", receipt_date: "", receipt_type: "purchase",
     total_amount: "", vat_percentage: "", vat_amount: "", category: "", subcategory: "", currency: "",
     private_use_share: "0",
+    description: "",
   });
 
   // Reset local overrides whenever we switch to a different receipt
@@ -980,6 +981,7 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
       subcategory:           receipt.subcategory ?? "",
       currency:              receipt.currency ?? "EUR",
       private_use_share:     String(Math.round((receipt.private_use_share ?? 0) * 100)),
+      description:           receipt.description ?? "",
     });
     setItemDrafts(
       (receipt.items ?? []).map((item, i) => ({
@@ -1096,6 +1098,8 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
       ] as [string, string][]) { if (v) payload[k] = v; }
       // Allow clearing subcategory when empty
       if (draft.subcategory === "") payload["subcategory"] = null;
+      // Allow clearing description (store null when empty)
+      payload["description"] = draft.description || null;
       for (const [k, v] of [
         ["total_amount", draft.total_amount], ["vat_percentage", draft.vat_percentage], ["vat_amount", draft.vat_amount],
       ] as [string, string][]) { if (v) payload[k] = parseDecimal(v); }
@@ -1438,13 +1442,29 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
                 </div>
                 <CategorySelect value={draft.category} onChange={(v) => setDraft((d) => ({ ...d, category: v, subcategory: "" }))} />
                 <SubcategorySelect category={draft.category} value={draft.subcategory} onChange={(v) => setDraft((d) => ({ ...d, subcategory: v }))} />
+                {/* Notes */}
+                <div className="flex items-start justify-between gap-3 py-2 border-b border-black/10 last:border-0">
+                  <span className="text-xs text-black/50 font-bold uppercase tracking-wider shrink-0 w-28 pt-0.5">
+                    {t("preview.field_notes", { defaultValue: "Notes" })}
+                  </span>
+                  <textarea
+                    value={draft.description}
+                    onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))}
+                    rows={2}
+                    placeholder={t("sidebar.manual_entry_notes_placeholder", { defaultValue: "z. B. USt-Erstattung Q1 2024" })}
+                    className="flex-1 min-w-0 text-xs text-black font-mono bg-amber-50 border border-amber-300 rounded px-2 py-1 outline-none focus:border-amber-500 resize-none"
+                  />
+                </div>
               </>
             ) : (
-              <>
+              <>  
                 <FieldRow label={t("preview.field_type")} value={receipt.receipt_type === "sale" ? t("preview.badge_revenue") : t("preview.badge_expense")} />
                 <FieldRow label={t("preview.field_category")} value={t(`sidebar.categories.${receipt.category}`, { defaultValue: receipt.category })} />
                 {receipt.subcategory && (
                   <FieldRow label={t("preview.field_subcategory", { defaultValue: "Subcategory" })} value={t(`sidebar.subcategories.${receipt.subcategory}`, { defaultValue: receipt.subcategory ?? "" })} />
+                )}
+                {receipt.description && (
+                  <FieldRow label={t("preview.field_notes", { defaultValue: "Notes" })} value={receipt.description} />
                 )}
               </>
             )}

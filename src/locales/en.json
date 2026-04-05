@@ -267,6 +267,7 @@
     "field_type": "Type",
     "field_category": "Category",
     "field_subcategory": "Subcategory",
+    "field_notes": "Notes",
     "subcategory_add_custom": "Add custom subcategory",
     "subcategory_placeholder": "Custom subcategory…",
     "btn_add": "Add",

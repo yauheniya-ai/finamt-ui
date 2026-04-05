@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import i18n from "../i18n";
 import { Icon } from "@iconify/react";
-import { CATEGORY_META, CASHFLOW_ONLY_CATS } from "../constants";
+import { CATEGORY_META, CASHFLOW_ONLY_CATS, CATEGORY_SUBCATEGORIES } from "../constants";
 import type { CategoryMeta } from "../constants";
 import { IconChevronDown, IconDelete, IconSpinner } from "../constants/icons";
 
@@ -80,6 +80,7 @@ export type Receipt = {
   duplicate?:     boolean;
   message?:       string;
   validation_warnings?: string[];
+  description:    string | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -372,6 +373,7 @@ export type ManualEntryForm = {
   vendor:         string;
   receipt_type:   "purchase" | "sale";
   category:       string;
+  subcategory:    string;
   net_amount:     string;   // string for controlled input, parsed on save
   vat_percentage: string;   // string for controlled input
   description:    string;
@@ -391,6 +393,7 @@ export function ManualEntryModal({ onSave, onClose, apiBase, dbPath, initialType
     vendor:         "",
     receipt_type:   initialType,
     category:       "other",
+    subcategory:    "",
     net_amount:     "",
     vat_percentage: "19",
     description:    "",
@@ -586,7 +589,7 @@ export function ManualEntryModal({ onSave, onClose, apiBase, dbPath, initialType
                     <li key={k}>
                       <button
                         type="button"
-                        onClick={() => { setForm((p) => ({ ...p, category: k })); setShowCatDropdown(false); }}
+                        onClick={() => { setForm((p) => ({ ...p, category: k, subcategory: "" })); setShowCatDropdown(false); }}
                         className={`w-full flex items-center gap-2 px-2 py-1.5 text-xs font-mono text-left hover:bg-amber-50 transition-colors ${k === form.category ? "bg-amber-100 font-bold" : ""}`}
                       >
                         <Icon icon={v.icon} className="shrink-0 text-base" />
@@ -600,6 +603,21 @@ export function ManualEntryModal({ onSave, onClose, apiBase, dbPath, initialType
             )}
           </div>
         </div>
+
+        {/* Subcategory */}
+        {(CATEGORY_SUBCATEGORIES[form.category] ?? []).length > 0 && (
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider">
+              {t("preview.field_subcategory", { defaultValue: "Subcategory" })}
+            </label>
+            <select value={form.subcategory} onChange={(e) => setForm((p) => ({ ...p, subcategory: e.target.value }))} className={inputCls}>
+              <option value="">—</option>
+              {(CATEGORY_SUBCATEGORIES[form.category] ?? []).map((k) => (
+                <option key={k} value={k}>{t(`sidebar.subcategories.${k}`, { defaultValue: k })}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Net amount + VAT */}
         <div className="flex gap-2">
