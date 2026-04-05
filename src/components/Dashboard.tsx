@@ -307,8 +307,10 @@ function JahresabschlussPanel({ allReceipts, period, taxpayer, onEditTaxpayer }:
         onClick={() => setOpen((v) => !v)}
       >
         <div>
-          <h3 className="text-black text-sm font-black uppercase tracking-wider">{t("dashboard.jab_title")}</h3>
-          <p className="text-[10px] text-black font-mono mt-0.5">{t("dashboard.jab_subtitle")}</p>
+          <h3 className="text-black text-sm font-black tracking-wide">{t("dashboard.jab_title")}</h3>
+          <p className="text-[10px] text-black font-mono mt-0.5">
+            Bilanz + GuV · <LawLink law="§§ 242–256a HGB" href="https://www.gesetze-im-internet.de/hgb/__242.html" /> · Kleinstkapitalgesellschaft (<LawLink law="§ 267a HGB" href="https://www.gesetze-im-internet.de/hgb/__267a.html" />)
+          </p>
         </div>
         <IconChevronDown className={`w-4 h-4 text-black shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
@@ -541,11 +543,37 @@ function JahresabschlussPanel({ allReceipts, period, taxpayer, onEditTaxpayer }:
 }
 
 // ---------------------------------------------------------------------------
+// Law reference link
+// ---------------------------------------------------------------------------
+function LawLink({ law, href }: { law: string; href: string }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(e) => e.stopPropagation()}
+      className="inline-flex items-center gap-0.5 hover:text-amber-700 transition-colors underline underline-offset-2 decoration-dotted"
+    >
+      {law}
+      <Icon icon="mdi:open-in-new" className="w-2.5 h-2.5 inline-block" />
+    </a>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // UStVA panel — collapsible
 // ---------------------------------------------------------------------------
-function UStVAPanel({ receipts }: { receipts: Receipt[] }) {
+function UStVAPanel({ receipts, period }: { receipts: Receipt[]; period: PeriodFilter }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const monthNames = t("sidebar.months", { returnObjects: true }) as string[];
+  const declType = period.mode === "month" ? t("dashboard.decl_monthly")
+    : period.mode === "quarter" ? t("dashboard.decl_quarterly")
+    : t("dashboard.decl_annual");
+  const periodTag = period.mode === "month" ? `${monthNames[period.month - 1]} ${period.year}`
+    : period.mode === "quarter" ? `Q${period.quarter} ${period.year}`
+    : period.mode === "year" ? String(period.year)
+    : String(new Date().getFullYear() - 1);
 
   const purchases   = receipts.filter((r) => r.receipt_type === "purchase");
   const sales       = receipts.filter((r) => r.receipt_type === "sale");
@@ -571,11 +599,9 @@ function UStVAPanel({ receipts }: { receipts: Receipt[] }) {
         onClick={() => setOpen((v) => !v)}
       >
         <div>
-          <h3 className="text-black text-sm font-black uppercase tracking-wider">{t("dashboard.vat_title")}</h3>
+          <h3 className="text-black text-sm font-black tracking-wide">{t("dashboard.vat_title")}</h3>
           <p className="text-[10px] text-black font-mono mt-0.5">
-            {receipts.length === 1
-              ? t("dashboard.vat_doc_count", { count: receipts.length })
-              : t("dashboard.vat_doc_count_plural", { count: receipts.length })}
+            {declType} · <LawLink law="§ 18 UStG" href="https://www.gesetze-im-internet.de/ustg_1980/__18.html" /> · {periodTag}
           </p>
         </div>
         <IconChevronDown className={`w-4 h-4 text-black shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
@@ -678,8 +704,10 @@ function UStErkPanel({ allReceipts, period }: { allReceipts: Receipt[]; period: 
         onClick={() => setOpen((v) => !v)}
       >
         <div>
-          <h3 className="text-black text-sm font-black uppercase tracking-wider">{t("dashboard.uste_title")}</h3>
-          <p className="text-[10px] text-black font-mono mt-0.5">{t("dashboard.uste_subtitle", { year })}</p>
+          <h3 className="text-black text-sm font-black tracking-wide">{t("dashboard.uste_title")}</h3>
+          <p className="text-[10px] text-black font-mono mt-0.5">
+            {t("dashboard.decl_annual")} · <LawLink law="§ 18 UStG" href="https://www.gesetze-im-internet.de/ustg_1980/__18.html" /> · {year}
+          </p>
         </div>
         <IconChevronDown className={`w-4 h-4 text-black shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
@@ -805,8 +833,10 @@ function GewStPanel({ allReceipts, period, taxpayer, onEditTaxpayer }: {
         onClick={() => setOpen((v) => !v)}
       >
         <div>
-          <h3 className="text-black text-sm font-black uppercase tracking-wider">{t("dashboard.gewst_title")}</h3>
-          <p className="text-[10px] text-black font-mono mt-0.5">{t("dashboard.gewst_subtitle", { year })}</p>
+          <h3 className="text-black text-sm font-black tracking-wide">{t("dashboard.gewst_title")}</h3>
+          <p className="text-[10px] text-black font-mono mt-0.5">
+            {t("dashboard.decl_annual")} · <LawLink law="§§ 14 ff. GewStG" href="https://www.gesetze-im-internet.de/gewstg/__14.html" /> · {year}
+          </p>
         </div>
         <IconChevronDown className={`w-4 h-4 text-black shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
@@ -919,8 +949,10 @@ function KStPanel({ allReceipts, period }: { allReceipts: Receipt[]; period: Per
         onClick={() => setOpen((v) => !v)}
       >
         <div>
-          <h3 className="text-black text-sm font-black uppercase tracking-wider">{t("dashboard.kst_title")}</h3>
-          <p className="text-[10px] text-black font-mono mt-0.5">{t("dashboard.kst_subtitle", { year })}</p>
+          <h3 className="text-black text-sm font-black tracking-wide">{t("dashboard.kst_title")}</h3>
+          <p className="text-[10px] text-black font-mono mt-0.5">
+            {t("dashboard.decl_annual")} · <LawLink law="§ 31 KStG" href="https://www.gesetze-im-internet.de/kstg_1977/__31.html" /> · KSt 1 · {year}
+          </p>
         </div>
         <IconChevronDown className={`w-4 h-4 text-black shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
@@ -1092,7 +1124,7 @@ export default function Dashboard({ receipts, allReceipts, period, taxpayer, onE
       </div>
 
       {/* UMSATZSTEUER-VORANMELDUNG */}
-      <UStVAPanel receipts={receipts} />
+      <UStVAPanel receipts={receipts} period={period} />
 
       {/* UMSATZSTEUERERKLÄRUNG */}
       <UStErkPanel allReceipts={allReceipts} period={period} />
