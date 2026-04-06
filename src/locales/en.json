@@ -31,6 +31,16 @@
       "quarter": "Quarter",
       "month": "Month"
     },
+    "recent_filter": {
+      "btn": "Recent",
+      "1h": "1h",
+      "8h": "8h",
+      "today": "Today",
+      "3d": "3 days",
+      "empty": "No receipts uploaded within this window."
+    },
+    "search_placeholder": "Search by name…",
+    "search_no_results": "No receipts match \"{{q}}\".",
     "months": [
       "Jan",
       "Feb",

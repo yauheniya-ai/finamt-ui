@@ -81,6 +81,7 @@ export type Receipt = {
   message?:       string;
   validation_warnings?: string[];
   description:    string | null;
+  created_at:     string | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -137,6 +138,24 @@ export function filterByPeriod(receipts: Receipt[], period: PeriodFilter): Recei
     if (period.mode === "month")   return y === period.year && m === period.month;
     return true;
   });
+}
+
+// ---------------------------------------------------------------------------
+// Recent-upload filter
+// ---------------------------------------------------------------------------
+
+export type RecentWindow = "1h" | "8h" | "today" | "3d";
+
+function getRecentCutoff(w: RecentWindow): number {
+  if (w === "today") return new Date().setHours(0, 0, 0, 0);
+  const msMap: Record<string, number> = { "1h": 3_600_000, "8h": 28_800_000, "3d": 259_200_000 };
+  return Date.now() - msMap[w];
+}
+
+function matchesRecent(r: Receipt, w: RecentWindow): boolean {
+  if (!r.created_at) return false;
+  const ts = new Date(r.created_at).getTime();
+  return !isNaN(ts) && ts >= getRecentCutoff(w);
 }
 
 // ---------------------------------------------------------------------------
@@ -827,6 +846,7 @@ function DeleteConfirm({ onConfirm, onCancel }: { onConfirm: () => void; onCance
 
 type Props = {
   receipts:         Receipt[];
+  allReceipts:      Receipt[];
   selectedId:       string | null;
   onSelect:         (receipt: Receipt) => void;
   onUpload:         (files: File[], type: "purchase" | "sale") => void;
@@ -1016,7 +1036,7 @@ function SectionDivider({ label, count, total, isRevenue, isOpen, onToggle }: { 
 // MONTHS rendered via t("sidebar.months") array
 
 export default function Sidebar({
-  receipts, selectedId, onSelect, onUpload, onManualEntry, onDelete, uploading, progressStep, onCancelUpload, error,
+  receipts, allReceipts, selectedId, onSelect, onUpload, onManualEntry, onDelete, uploading, progressStep, onCancelUpload, error,
   period, onPeriodChange, taxpayer, onEditTaxpayer, apiBase, dbPath,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -1028,8 +1048,23 @@ export default function Sidebar({
   const [uploadType,      setUploadType]      = useState<"purchase" | "sale">("purchase");
   const [confirmingId,    setConfirmingId]    = useState<string | null>(null);
   const [showManualEntry, setShowManualEntry] = useState(false);
+  const [recentWindow,    setRecentWindow]    = useState<RecentWindow | null>(null);
+  const [nameQuery,       setNameQuery]       = useState("");
 
-  const grouped = receipts.reduce<Record<string, Receipt[]>>((acc, r) => {
+  const nameQ = nameQuery.trim().toLowerCase();
+
+  // Name search scans all receipts (ignores period & recent filters).
+  // Recent filter overrides the period filter when active (but not name search).
+  const displayedReceipts = nameQ
+    ? allReceipts.filter((r) => {
+        const name = (r.vendor ?? r.counterparty?.name ?? "").toLowerCase();
+        return name.includes(nameQ);
+      })
+    : recentWindow !== null
+      ? allReceipts.filter((r) => matchesRecent(r, recentWindow))
+      : receipts;
+
+  const grouped = displayedReceipts.reduce<Record<string, Receipt[]>>((acc, r) => {
     // Normalize any category not in CATEGORY_META to "other" so it always renders
     const cat = r.category in CATEGORY_META ? r.category : "other";
     (acc[cat] ??= []).push(r);
@@ -1059,12 +1094,12 @@ export default function Sidebar({
   // Counts + totals for section headers
   // Cashflow-only categories (tax settlements, capital movements) are shown
   // in a separate section and excluded from Revenue/Expense P&L totals.
-  const purchases = receipts.filter((r) => r.receipt_type === "purchase" && !CASHFLOW_ONLY_CATS.has(r.category));
-  const sales      = receipts.filter((r) => r.receipt_type === "sale"     && !CASHFLOW_ONLY_CATS.has(r.category));
+  const purchases = displayedReceipts.filter((r) => r.receipt_type === "purchase" && !CASHFLOW_ONLY_CATS.has(r.category));
+  const sales      = displayedReceipts.filter((r) => r.receipt_type === "sale"     && !CASHFLOW_ONLY_CATS.has(r.category));
   const purchaseTotal = purchases.reduce((s, r) => s + (r.total_amount ?? 0), 0);
   const saleTotal     = sales.reduce((s, r) => s + (r.total_amount ?? 0), 0);
 
-  const cashflowReceipts = receipts.filter((r) => CASHFLOW_ONLY_CATS.has(r.category));
+  const cashflowReceipts = displayedReceipts.filter((r) => CASHFLOW_ONLY_CATS.has(r.category));
   const cashflowTotal    = cashflowReceipts.reduce((s, r) => {
     const signed = r.receipt_type === "sale" ? (r.total_amount ?? 0) : -(r.total_amount ?? 0);
     return s + signed;
@@ -1202,79 +1237,125 @@ export default function Sidebar({
 
       {/* Period filter */}
       <div className="px-3 py-2 border-b border-black/10 bg-white flex flex-col gap-1.5">
-        {/* Mode tabs */}
-        <div className="flex rounded border border-black/10 overflow-hidden text-[10px] font-bold">
-          {(["all", "year", "quarter", "month"] as PeriodMode[]).map((m) => (
-            <button
-              key={m}
-              onClick={() => onPeriodChange({ ...period, mode: m })}
-              className={`flex-1 py-1 capitalize transition-colors ${
-                period.mode === m
-                  ? "bg-black text-white"
-                  : "bg-white text-black/40 hover:bg-red-50"
-              }`}
-            >
-              {t(`sidebar.period.${m}`, m)}
-            </button>
-          ))}
+        {/* Period controls — dimmed when recent-upload filter or name search is active */}
+        <div className={recentWindow !== null || !!nameQ ? "opacity-30 pointer-events-none select-none" : ""}>
+          {/* Mode tabs */}
+          <div className="flex rounded border border-black/10 overflow-hidden text-[10px] font-bold">
+            {(["all", "year", "quarter", "month"] as PeriodMode[]).map((m) => (
+              <button
+                key={m}
+                onClick={() => onPeriodChange({ ...period, mode: m })}
+                className={`flex-1 py-1 capitalize transition-colors ${
+                  period.mode === m
+                    ? "bg-black text-white"
+                    : "bg-white text-black/40 hover:bg-red-50"
+                }`}
+              >
+                {t(`sidebar.period.${m}`, m)}
+              </button>
+            ))}
+          </div>
+
+          {/* Year selector — shown for all modes except "all" */}
+          {period.mode !== "all" && (
+            <div className="flex items-center gap-1.5 mt-1.5">
+              <button
+                onClick={() => onPeriodChange({ ...period, year: period.year - 1 })}
+                className="text-black/40 hover:text-black transition-colors"
+              >
+                <Icon icon="mdi:chevron-left" className="w-4 h-4" />
+              </button>
+              <span className="flex-1 text-center text-xs font-black font-mono">{period.year}</span>
+              <button
+                onClick={() => onPeriodChange({ ...period, year: period.year + 1 })}
+                className="text-black/40 hover:text-black transition-colors"
+              >
+                <Icon icon="mdi:chevron-right" className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {/* Quarter picker */}
+          {period.mode === "quarter" && (
+            <div className="flex gap-1 mt-1.5">
+              {[1,2,3,4].map((q) => (
+                <button
+                  key={q}
+                  onClick={() => onPeriodChange({ ...period, quarter: q })}
+                  className={`flex-1 py-0.5 text-[10px] font-black rounded transition-colors ${
+                    period.quarter === q
+                      ? "bg-red-500 text-white"
+                      : "bg-black/5 text-black/50 hover:bg-black/10"
+                  }`}
+                >
+                  Q{q}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Month picker */}
+          {period.mode === "month" && (
+            <div className="grid grid-cols-4 gap-1 mt-1.5">
+              {(t("sidebar.months", { returnObjects: true }) as string[]).map((name: string, i: number) => (
+                <button
+                  key={i}
+                  onClick={() => onPeriodChange({ ...period, month: i + 1 })}
+                  className={`py-0.5 text-[10px] font-black rounded transition-colors ${
+                    period.month === i + 1
+                      ? "bg-red-500 text-white"
+                      : "bg-black/5 text-black/50 hover:bg-black/10"
+                  }`}
+                >
+                  {name}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Year selector — shown for all modes except "all" */}
-        {period.mode !== "all" && (
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => onPeriodChange({ ...period, year: period.year - 1 })}
-              className="text-black/40 hover:text-black transition-colors"
-            >
-              <Icon icon="mdi:chevron-left" className="w-4 h-4" />
-            </button>
-            <span className="flex-1 text-center text-xs font-black font-mono">{period.year}</span>
-            <button
-              onClick={() => onPeriodChange({ ...period, year: period.year + 1 })}
-              className="text-black/40 hover:text-black transition-colors"
-            >
-              <Icon icon="mdi:chevron-right" className="w-4 h-4" />
-            </button>
-          </div>
-        )}
-
-        {/* Quarter picker */}
-        {period.mode === "quarter" && (
-          <div className="flex gap-1">
-            {[1,2,3,4].map((q) => (
+        {/* Recent uploads filter */}
+        <div className={`flex items-center gap-1.5 pt-0.5 border-t border-black/5 ${nameQ ? "opacity-30 pointer-events-none select-none" : ""}`}>
+          <Icon icon="mdi:clock-fast" className="w-3.5 h-3.5 text-black/30 shrink-0" />
+          <span className="text-[10px] font-black uppercase tracking-wider text-black/30 shrink-0">
+            {t("sidebar.recent_filter.btn")}
+          </span>
+          <div className="flex gap-0.5 ml-auto">
+            {(["1h", "8h", "today", "3d"] as RecentWindow[]).map((w) => (
               <button
-                key={q}
-                onClick={() => onPeriodChange({ ...period, quarter: q })}
-                className={`flex-1 py-0.5 text-[10px] font-black rounded transition-colors ${
-                  period.quarter === q
-                    ? "bg-red-500 text-white"
-                    : "bg-black/5 text-black/50 hover:bg-black/10"
+                key={w}
+                onClick={() => setRecentWindow(recentWindow === w ? null : w)}
+                className={`px-1.5 py-0.5 text-[10px] font-black rounded transition-colors ${
+                  recentWindow === w
+                    ? "bg-amber-400 text-black"
+                    : "bg-black/5 text-black/40 hover:bg-black/10"
                 }`}
               >
-                Q{q}
+                {t(`sidebar.recent_filter.${w}` as any)}
               </button>
             ))}
           </div>
-        )}
+        </div>
 
-        {/* Month picker */}
-        {period.mode === "month" && (
-          <div className="grid grid-cols-4 gap-1">
-            {(t("sidebar.months", { returnObjects: true }) as string[]).map((name: string, i: number) => (
-              <button
-                key={i}
-                onClick={() => onPeriodChange({ ...period, month: i + 1 })}
-                className={`py-0.5 text-[10px] font-black rounded transition-colors ${
-                  period.month === i + 1
-                    ? "bg-red-500 text-white"
-                    : "bg-black/5 text-black/50 hover:bg-black/10"
-                }`}
-              >
-                {name}
-              </button>
-            ))}
-          </div>
-        )}
+        {/* Name search */}
+        <div className="flex items-center gap-1.5 pt-0.5 border-t border-black/5">
+          <Icon icon="mdi:magnify" className="w-3.5 h-3.5 text-black/30 shrink-0" />
+          <input
+            type="text"
+            value={nameQuery}
+            onChange={(e) => setNameQuery(e.target.value)}
+            placeholder={t("sidebar.search_placeholder")}
+            className="flex-1 min-w-0 bg-transparent text-[10px] font-mono text-black placeholder:text-black/25 outline-none"
+          />
+          {nameQuery && (
+            <button
+              onClick={() => setNameQuery("")}
+              className="text-black/30 hover:text-black transition-colors shrink-0"
+            >
+              <Icon icon="mdi:close" className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Lists */}
@@ -1316,11 +1397,15 @@ export default function Sidebar({
           </>
         )}
 
-        {receipts.length === 0 && (
+        {displayedReceipts.length === 0 && (
           <div className="flex flex-col items-center justify-center gap-3 p-8 text-center">
-            <Icon icon="mdi:receipt-text-outline" className="w-10 h-10 text-black/20" />
+            <Icon icon={nameQ ? "mdi:magnify" : recentWindow !== null ? "mdi:clock-outline" : "mdi:receipt-text-outline"} className="w-10 h-10 text-black/20" />
             <p className="text-black/40 text-xs leading-relaxed">
-              {t("sidebar.no_receipts")}<br />{t("sidebar.no_receipts_hint")}
+              {nameQ
+                ? t("sidebar.search_no_results", { q: nameQuery.trim() })
+                : recentWindow !== null
+                  ? t("sidebar.recent_filter.empty")
+                  : <>{t("sidebar.no_receipts")}<br />{t("sidebar.no_receipts_hint")}</>}
             </p>
           </div>
         )}

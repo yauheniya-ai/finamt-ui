@@ -210,6 +210,7 @@ export default function App() {
       <div className="flex flex-1 overflow-hidden">
         <Sidebar
           receipts={visibleReceipts}
+          allReceipts={receipts}
           selectedId={selected?.id ?? null}
           onSelect={setSelected}
           onUpload={handleUpload}

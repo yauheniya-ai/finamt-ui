@@ -31,6 +31,16 @@
       "quarter": "Quartal",
       "month": "Monat"
     },
+    "recent_filter": {
+      "btn": "Neu",
+      "1h": "1 Std",
+      "8h": "8 Std",
+      "today": "Heute",
+      "3d": "3 Tage",
+      "empty": "Keine Belege in diesem Zeitfenster hochgeladen."
+    },
+    "search_placeholder": "Nach Namen suchen…",
+    "search_no_results": "Kein Beleg passt zu \"{{q}}\".",
     "months": [
       "Jan",
       "Feb",
