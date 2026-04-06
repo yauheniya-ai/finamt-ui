@@ -148,11 +148,11 @@ function SubcategorySelect({
   category, value, onChange,
 }: { category: string; value: string; onChange: (v: string) => void }) {
   const { t } = useTranslation();
+  const [open,        setOpen]        = useState(false);
   const [customInput, setCustomInput] = useState("");
   const [showCustom,  setShowCustom]  = useState(false);
 
   const builtIn = CATEGORY_SUBCATEGORIES[category] ?? [];
-  // Collect custom entries stored in localStorage per category
   const storageKey = `finamt_subcats_${category}`;
   const getCustom = (): string[] => {
     try { return JSON.parse(localStorage.getItem(storageKey) ?? "[]"); } catch { return []; }
@@ -166,6 +166,7 @@ function SubcategorySelect({
 
   const handleSelect = (v: string) => {
     onChange(v);
+    setOpen(false);
     setShowCustom(false);
   };
 
@@ -182,6 +183,10 @@ function SubcategorySelect({
     setShowCustom(false);
   };
 
+  const displayLabel = value
+    ? t(`sidebar.subcategories.${value}`, { defaultValue: value })
+    : "—";
+
   return (
     <div className="flex items-start justify-between gap-3 py-2 border-b border-black/10">
       <span className="text-xs text-black/50 font-bold uppercase tracking-wider shrink-0 w-28 pt-0.5">
@@ -189,25 +194,54 @@ function SubcategorySelect({
       </span>
       <div className="relative flex-1 min-w-0 flex flex-col gap-1">
         <div className="flex gap-1">
-          <select
-            value={value}
-            onChange={(e) => handleSelect(e.target.value)}
-            className="flex-1 text-xs font-mono text-black bg-amber-50 border border-amber-300 rounded px-2 py-1 outline-none focus:border-amber-500"
-          >
-            <option value="">—</option>
-            {allSubs.map((s) => (
-              <option key={s} value={s}>{t(`sidebar.subcategories.${s}`, { defaultValue: s })}</option>
-            ))}
-          </select>
+          {/* Trigger */}
           <button
             type="button"
-            onClick={() => setShowCustom((o) => !o)}
+            onClick={() => { setOpen((o) => !o); setShowCustom(false); }}
+            className="flex-1 min-w-0 flex items-center gap-1.5 text-xs text-black font-mono bg-amber-50 border border-amber-300 rounded px-2 py-1 outline-none focus:border-amber-500 cursor-pointer"
+          >
+            <span className="flex-1 text-left truncate">{displayLabel}</span>
+            <IconChevronDown className={`shrink-0 text-base transition-transform ${open ? "rotate-180" : ""}`} />
+          </button>
+          <button
+            type="button"
+            onClick={() => { setShowCustom((o) => !o); setOpen(false); }}
             className="text-[10px] font-bold text-black/50 hover:text-black border border-black/20 hover:border-black px-2 rounded transition-colors"
             title={t("preview.subcategory_add_custom", { defaultValue: "Add custom" })}
           >
             <Icon icon="mdi:plus" className="w-3.5 h-3.5" />
           </button>
         </div>
+
+        {/* Dropdown */}
+        {open && (
+          <ul
+            className="absolute z-30 top-full mt-1 w-full bg-white border border-amber-300 rounded shadow-lg max-h-56 overflow-y-auto"
+            onMouseLeave={() => setOpen(false)}
+          >
+            <li>
+              <button
+                type="button"
+                onClick={() => handleSelect("")}
+                className={`w-full flex items-center px-2 py-1.5 text-xs font-mono text-left hover:bg-amber-50 transition-colors ${value === "" ? "bg-amber-100 font-bold" : "text-black/40"}`}
+              >
+                —
+              </button>
+            </li>
+            {allSubs.map((s) => (
+              <li key={s}>
+                <button
+                  type="button"
+                  onClick={() => handleSelect(s)}
+                  className={`w-full flex items-center px-2 py-1.5 text-xs font-mono text-left hover:bg-amber-50 transition-colors truncate ${s === value ? "bg-amber-100 font-bold" : ""}`}
+                >
+                  {t(`sidebar.subcategories.${s}`, { defaultValue: s })}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
         {showCustom && (
           <div className="flex gap-1">
             <input
@@ -1434,11 +1468,22 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
               <>
                 <div className="flex items-start justify-between gap-3 py-2 border-b border-black/10">
                   <span className="text-xs text-black/50 font-bold uppercase tracking-wider shrink-0 w-28 pt-0.5">{t("preview.field_type")}</span>
-                  <select value={draft.receipt_type} onChange={(e) => setDraft((d) => ({ ...d, receipt_type: e.target.value }))}
-                    className="flex-1 min-w-0 text-xs font-mono text-black bg-amber-50 border border-amber-300 rounded px-2 py-1 outline-none focus:border-amber-500">
-                    <option value="purchase">{t("preview.type_purchase")}</option>
-                    <option value="sale">{t("preview.type_sale")}</option>
-                  </select>
+                  <div className="flex flex-1 min-w-0 rounded border border-black/10 overflow-hidden text-xs font-bold">
+                    {(["purchase", "sale"] as const).map((type) => (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => setDraft((d) => ({ ...d, receipt_type: type }))}
+                        className={`flex-1 py-1 transition-colors ${
+                          draft.receipt_type === type
+                            ? "bg-black text-white"
+                            : "bg-amber-50 text-black/40 hover:bg-amber-100"
+                        }`}
+                      >
+                        {type === "purchase" ? t("preview.type_purchase") : t("preview.type_sale")}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <CategorySelect value={draft.category} onChange={(v) => setDraft((d) => ({ ...d, category: v, subcategory: "" }))} />
                 <SubcategorySelect category={draft.category} value={draft.subcategory} onChange={(v) => setDraft((d) => ({ ...d, subcategory: v }))} />

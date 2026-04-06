@@ -24,6 +24,7 @@ export const CATEGORY_META: Record<string, CategoryMeta> = {
   office:            { label: "office",            icon: "vaadin:office" },
   marketing:         { label: "marketing",         icon: "mdi:loudspeaker" },  
   donations:         { label: "donations",         icon: "mdi:donation" },
+  public_fees:       { label: "public_fees",       icon: "mdi:gavel" },
   other:             { label: "other",             icon: "flowbite:folder-plus-solid" },
   tax_settlement:    { label: "tax_settlement",    icon: "mdi:bank-transfer" },
   capital_movement:  { label: "capital_movement",  icon: "mdi:wallet-plus" },
@@ -148,6 +149,13 @@ export const CATEGORY_SUBCATEGORIES: Record<string, string[]> = {
     "charitable",
     "political",
     "church",
+  ],
+
+  public_fees: [
+    "broadcasting_fee",
+    "ihk_hwk",
+    "berufsgenossenschaft",
+    "other_public_fee",
   ],
 
   other: [

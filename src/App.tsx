@@ -158,6 +158,7 @@ export default function App() {
       const body = {
         date:           entry.date,
         vendor:         entry.vendor || null,
+        vendor_verified: entry.vendor_verified,
         receipt_type:   entry.receipt_type,
         category:       entry.category,
         subcategory:    entry.subcategory || null,

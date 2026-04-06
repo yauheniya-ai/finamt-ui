@@ -369,15 +369,16 @@ export function TaxpayerModal({ initial, onSave, onClear, onClose }: {
 type VerifiedCpEntry = { id: string; name: string | null; vat_id: string | null; tax_number: string | null };
 
 export type ManualEntryForm = {
-  date:           string;
-  vendor:         string;
-  receipt_type:   "purchase" | "sale";
-  category:       string;
-  subcategory:    string;
-  net_amount:     string;   // string for controlled input, parsed on save
-  vat_percentage: string;   // string for controlled input
-  description:    string;
-  currency:       string;
+  date:            string;
+  vendor:          string;
+  vendor_verified: boolean;
+  receipt_type:    "purchase" | "sale";
+  category:        string;
+  subcategory:     string;
+  net_amount:      string;   // string for controlled input, parsed on save
+  vat_percentage:  string;   // string for controlled input
+  description:     string;
+  currency:        string;
 };
 
 export function ManualEntryModal({ onSave, onClose, apiBase, dbPath, initialType }: {
@@ -389,15 +390,16 @@ export function ManualEntryModal({ onSave, onClose, apiBase, dbPath, initialType
 }) {
   const { t } = useTranslation();
   const initialForm = useRef<ManualEntryForm>({
-    date:           new Date().toISOString().slice(0, 10),
-    vendor:         "",
-    receipt_type:   initialType,
-    category:       "other",
-    subcategory:    "",
-    net_amount:     "",
-    vat_percentage: "0",
-    description:    "",
-    currency:       "EUR",
+    date:            new Date().toISOString().slice(0, 10),
+    vendor:          "",
+    vendor_verified: false,
+    receipt_type:    initialType,
+    category:        "other",
+    subcategory:     "",
+    net_amount:      "",
+    vat_percentage:  "0",
+    description:     "",
+    currency:        "EUR",
   });
   const [form, setForm] = useState<ManualEntryForm>(initialForm.current);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
@@ -415,7 +417,9 @@ export function ManualEntryModal({ onSave, onClose, apiBase, dbPath, initialType
       setForm((prev) => ({ ...prev, [key]: e.target.value }));
 
   // Category dropdown
-  const [showCatDropdown, setShowCatDropdown] = useState(false);
+  const [showCatDropdown,    setShowCatDropdown]    = useState(false);
+  const [showSubcatDropdown, setShowSubcatDropdown] = useState(false);
+  const [showVatDropdown,    setShowVatDropdown]    = useState(false);
 
   // Verified counterparty picker
   const [showCpPicker, setShowCpPicker] = useState(false);
@@ -498,6 +502,23 @@ export function ManualEntryModal({ onSave, onClose, apiBase, dbPath, initialType
           </label>
           <input type="text" value={form.vendor} onChange={set("vendor")} className={inputCls}
             placeholder="z. B. Finanzamt Berlin" />
+          {/* Verified checkbox */}
+          <label className="flex items-center gap-2 mt-0.5 cursor-pointer select-none">
+            <span className={`w-3.5 h-3.5 rounded-sm border flex items-center justify-center transition-colors ${
+              form.vendor_verified ? "bg-amber-400 border-amber-500" : "bg-white border-black/30"
+            }`}>
+              {form.vendor_verified && <Icon icon="mdi:check" className="w-2.5 h-2.5 text-black" />}
+            </span>
+            <input
+              type="checkbox"
+              className="sr-only"
+              checked={form.vendor_verified}
+              onChange={(e) => setForm((p) => ({ ...p, vendor_verified: e.target.checked }))}
+            />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-black/40">
+              {t("preview.cp_field_verified", { defaultValue: "Verified" })}
+            </span>
+          </label>
           {/* Verified counterparty picker */}
           <div>
             <button
@@ -536,6 +557,22 @@ export function ManualEntryModal({ onSave, onClose, apiBase, dbPath, initialType
                       setForm((p) => ({ ...p, vendor: cp.name ?? "" }));
                       setShowCpPicker(false);
                       setCpQuery("");
+                      // Prefill category/subcategory from most-common DB values
+                      if (cp.id) {
+                        const dbQs = dbPath ? `&db=${encodeURIComponent(dbPath)}` : "";
+                        fetch(`${apiBase}/counterparties/${encodeURIComponent(cp.id)}/defaults?${dbQs}`)
+                          .then((r) => r.json())
+                          .then((d: { category?: string; subcategory?: string }) => {
+                            if (d.category) {
+                              setForm((p) => ({
+                                ...p,
+                                category:    d.category!,
+                                subcategory: d.subcategory ?? "",
+                              }));
+                            }
+                          })
+                          .catch(() => {});
+                      }
                     }}
                     className="w-full text-left px-3 py-2 hover:bg-amber-50 border-b border-black/5 last:border-0 transition-colors"
                   >
@@ -610,12 +647,45 @@ export function ManualEntryModal({ onSave, onClose, apiBase, dbPath, initialType
             <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider">
               {t("preview.field_subcategory", { defaultValue: "Subcategory" })}
             </label>
-            <select value={form.subcategory} onChange={(e) => setForm((p) => ({ ...p, subcategory: e.target.value }))} className={inputCls}>
-              <option value="">—</option>
-              {(CATEGORY_SUBCATEGORIES[form.category] ?? []).map((k) => (
-                <option key={k} value={k}>{t(`sidebar.subcategories.${k}`, { defaultValue: k })}</option>
-              ))}
-            </select>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => { setShowSubcatDropdown((o) => !o); setShowVatDropdown(false); setShowCatDropdown(false); }}
+                className={`${inputCls} flex items-center gap-1.5 text-left cursor-pointer`}
+              >
+                <span className="flex-1 truncate">
+                  {form.subcategory
+                    ? t(`sidebar.subcategories.${form.subcategory}`, { defaultValue: form.subcategory })
+                    : "—"}
+                </span>
+                <IconChevronDown className={`shrink-0 text-sm transition-transform ${showSubcatDropdown ? "rotate-180" : ""}`} />
+              </button>
+              {showSubcatDropdown && (
+                <ul
+                  className="absolute z-30 mt-1 w-full bg-white border border-amber-300 rounded shadow-lg max-h-48 overflow-y-auto"
+                  onMouseLeave={() => setShowSubcatDropdown(false)}
+                >
+                  <li>
+                    <button
+                      type="button"
+                      onClick={() => { setForm((p) => ({ ...p, subcategory: "" })); setShowSubcatDropdown(false); }}
+                      className={`w-full text-left px-2 py-1.5 text-xs font-mono hover:bg-amber-50 transition-colors ${form.subcategory === "" ? "bg-amber-100 font-bold" : "text-black/40"}`}
+                    >—</button>
+                  </li>
+                  {(CATEGORY_SUBCATEGORIES[form.category] ?? []).map((k) => (
+                    <li key={k}>
+                      <button
+                        type="button"
+                        onClick={() => { setForm((p) => ({ ...p, subcategory: k })); setShowSubcatDropdown(false); }}
+                        className={`w-full text-left px-2 py-1.5 text-xs font-mono hover:bg-amber-50 transition-colors truncate ${k === form.subcategory ? "bg-amber-100 font-bold" : ""}`}
+                      >
+                        {t(`sidebar.subcategories.${k}`, { defaultValue: k })}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
         )}
 
@@ -632,11 +702,34 @@ export function ManualEntryModal({ onSave, onClose, apiBase, dbPath, initialType
             <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider">
               {t("sidebar.manual_entry_vat")}
             </label>
-            <select value={form.vat_percentage} onChange={set("vat_percentage")} className={inputCls}>
-              {["0", "7", "19"].map((r) => (
-                <option key={r} value={r}>{r} %</option>
-              ))}
-            </select>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => { setShowVatDropdown((o) => !o); setShowSubcatDropdown(false); setShowCatDropdown(false); }}
+                className={`${inputCls} flex items-center gap-1 text-left cursor-pointer`}
+              >
+                <span className="flex-1">{form.vat_percentage} %</span>
+                <IconChevronDown className={`shrink-0 text-sm transition-transform ${showVatDropdown ? "rotate-180" : ""}`} />
+              </button>
+              {showVatDropdown && (
+                <ul
+                  className="absolute z-30 mt-1 w-full bg-white border border-amber-300 rounded shadow-lg overflow-hidden"
+                  onMouseLeave={() => setShowVatDropdown(false)}
+                >
+                  {["0", "7", "19"].map((r) => (
+                    <li key={r}>
+                      <button
+                        type="button"
+                        onClick={() => { setForm((p) => ({ ...p, vat_percentage: r })); setShowVatDropdown(false); }}
+                        className={`w-full text-left px-2 py-1.5 text-xs font-mono hover:bg-amber-50 transition-colors ${r === form.vat_percentage ? "bg-amber-100 font-bold" : ""}`}
+                      >
+                        {r} %
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
         </div>
 
