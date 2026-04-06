@@ -369,7 +369,7 @@
     "count_receipts_plural": "{{n}} Belege",
 
     "gewst_title": "Gewerbesteuererklärung (GewStE)",
-    "gewst_subtitle": "Jahreserklärung · §§ 14 ff. GewStG · {{year}}",
+    "gewst_subtitle": "Jahreserklärung · §§ 14 ff. GewStG · GewSt 1A · {{year}}",
     "gewst_hebesatz": "Hebesatz",
     "gewst_gewerbeertrag": "Gewerbeertrag (annähernd aus Jahresüberschuss)",
     "gewst_rounded": "Abgerundet auf volle 100 € (§ 11 GewStG)",

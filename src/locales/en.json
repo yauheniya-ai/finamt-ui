@@ -369,7 +369,7 @@
     "count_receipts_plural": "{{n}} receipts",
 
     "gewst_title": "Gewerbesteuererklärung (GewStE)",
-    "gewst_subtitle": "Annual declaration · §§ 14 ff. GewStG · {{year}}",
+    "gewst_subtitle": "Annual declaration · §§ 14 ff. GewStG · GewSt 1A · {{year}}",
     "gewst_hebesatz": "Hebesatz (municipal multiplier)",
     "gewst_gewerbeertrag": "Trade income (Gewerbeertrag, approx.)",
     "gewst_rounded": "Rounded down to full € 100 (§ 11 GewStG)",
