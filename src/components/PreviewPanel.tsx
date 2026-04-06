@@ -955,6 +955,7 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
     receipt_number: "", receipt_date: "", receipt_type: "purchase",
     total_amount: "", vat_percentage: "", vat_amount: "", category: "", subcategory: "", currency: "",
     private_use_share: "0",
+    einfuhr_vat: "",
     description: "",
   });
 
@@ -1015,6 +1016,7 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
       subcategory:           receipt.subcategory ?? "",
       currency:              receipt.currency ?? "EUR",
       private_use_share:     String(Math.round((receipt.private_use_share ?? 0) * 100)),
+      einfuhr_vat:           numToInputStr(receipt.einfuhr_vat),
       description:           receipt.description ?? "",
     });
     setItemDrafts(
@@ -1141,8 +1143,12 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
       if (draft.receipt_type === "purchase") {
         const pus = parseDecimal(draft.private_use_share);
         payload.private_use_share = isNaN(pus) ? 0 : Math.max(0, Math.min(1, pus / 100));
+        // einfuhr_vat — only for purchases, send null when blank
+        const ev = parseDecimal(draft.einfuhr_vat);
+        payload.einfuhr_vat = (!draft.einfuhr_vat || isNaN(ev)) ? null : ev;
       } else {
         payload.private_use_share = 0;
+        payload.einfuhr_vat = null;
       }
       if (draft.currency) payload.currency = draft.currency.toUpperCase();
       if (draft.vat_id)     payload.vat_id     = draft.vat_id;
@@ -1668,6 +1674,18 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
               </div>
             )}
 
+            {/* Einfuhrumsatzsteuer — edit mode (purchases only) */}
+            {editing && draft.receipt_type === "purchase" && (
+              <FieldRow
+                label={t("preview.field_einfuhr_vat")}
+                value=""
+                editing={true}
+                inputValue={draft.einfuhr_vat}
+                onInput={(v) => setDraft((d) => ({ ...d, einfuhr_vat: v }))}
+                placeholder="0.00"
+              />
+            )}
+
             {/* Private Use — display mode (purchases with share > 0 only) */}
             {!editing && receipt.receipt_type === "purchase" && (receipt.private_use_share ?? 0) > 0 && (
               <>
@@ -1682,6 +1700,14 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
                   <FieldRow label={t("preview.field_business_net")} value={cvt(receipt.business_net)} />
                 )}
               </>
+            )}
+
+            {/* Einfuhrumsatzsteuer — view mode (purchases with einfuhr_vat > 0 only) */}
+            {!editing && receipt.receipt_type === "purchase" && (receipt.einfuhr_vat ?? 0) > 0 && (
+              <FieldRow
+                label={t("preview.field_einfuhr_vat")}
+                value={cvt(receipt.einfuhr_vat)}
+              />
             )}
           </div>
         </section>

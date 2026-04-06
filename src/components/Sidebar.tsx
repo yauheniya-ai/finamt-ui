@@ -72,6 +72,7 @@ export type Receipt = {
   private_use_share: number;          // 0–1; default 0
   business_net:      number | null;
   business_vat:      number | null;
+  einfuhr_vat:       number | null;   // Einfuhrumsatzsteuer § 15 Abs. 1 Nr. 2 UStG
   currency:          string;
   category:       string;
   subcategory:    string | null;

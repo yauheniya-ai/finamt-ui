@@ -612,7 +612,9 @@ function UStVAPanel({ receipts, period }: { receipts: Receipt[]; period: PeriodF
 
   const purchases   = receipts.filter((r) => r.receipt_type === "purchase");
   const sales       = receipts.filter((r) => r.receipt_type === "sale");
-  const inputVat    = purchases.reduce((s, r) => s + (r.business_vat ?? r.vat_amount ?? 0), 0);
+  const regularInputVat = purchases.reduce((s, r) => s + (r.business_vat ?? r.vat_amount ?? 0), 0);
+  const einfuhrInputVat = purchases.reduce((s, r) => s + (r.einfuhr_vat ?? 0), 0);
+  const inputVat    = regularInputVat + einfuhrInputVat;
   const outputVat   = sales.reduce((s, r) => s + (r.business_vat ?? r.vat_amount ?? 0), 0);
   const netLiability = outputVat - inputVat;
 
@@ -717,7 +719,9 @@ function UStErkPanel({ allReceipts, period }: { allReceipts: Receipt[]; period: 
 
   const purchases    = yearReceipts.filter((r) => r.receipt_type === "purchase");
   const sales        = yearReceipts.filter((r) => r.receipt_type === "sale");
-  const inputVat     = purchases.reduce((s, r) => s + (r.business_vat ?? r.vat_amount ?? 0), 0);
+  const regularInputVat = purchases.reduce((s, r) => s + (r.business_vat ?? r.vat_amount ?? 0), 0);
+  const einfuhrInputVat = purchases.reduce((s, r) => s + (r.einfuhr_vat ?? 0), 0);
+  const inputVat     = regularInputVat + einfuhrInputVat;
   const outputVat    = sales.reduce((s, r) => s + (r.business_vat ?? r.vat_amount ?? 0), 0);
   const netLiability = outputVat - inputVat;
 
@@ -794,8 +798,16 @@ function UStErkPanel({ allReceipts, period }: { allReceipts: Receipt[]; period: 
                   {t("dashboard.vat_input_section")}
                 </span>
               </td></tr>
-              <VatRow line="66" label={t("dashboard.vat_input_label")}
-                tax={fmt(inputVat)} />
+              <VatRow line="122" label={t("dashboard.uste_input_regular_label")}
+                tax={fmt(regularInputVat)} />
+              {einfuhrInputVat > 0 && (
+                <VatRow line="124" label={t("dashboard.vat_einfuhr_label")}
+                  tax={fmt(einfuhrInputVat)} />
+              )}
+              {einfuhrInputVat > 0 && (
+                <VatRow line="131" label={t("dashboard.uste_input_sum_label")} bold
+                  tax={fmt(inputVat)} />
+              )}
               <tr className="border-t-2 border-amber-400">
                 <td className="pt-3 pb-2 pr-3 text-[11px] font-mono font-bold text-black w-8">83</td>
                 <td className="pt-3 pb-2">
