@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Icon } from "@iconify/react";
 import { IconChevronDown } from "../constants/icons";
+import elsterLogo from "../assets/elster.svg";
 import { useTranslation } from "react-i18next";
 import type { Receipt, PeriodFilter, TaxpayerProfile } from "./Sidebar";
 import { CATEGORY_META, CASHFLOW_ONLY_CATS, fmt, displayName } from "./Sidebar";
@@ -117,15 +118,32 @@ function CategoryChart({ title, totals, receipts }: {
 }
 
 // ---------------------------------------------------------------------------
+// ELSTER tip icon with tooltip
+// ---------------------------------------------------------------------------
+function ElsterTip({ lines }: { lines: string[] }) {
+  return (
+    <span className="relative group inline-flex items-center align-middle ml-1">
+      <img src={elsterLogo} alt="ELSTER" className="w-3 h-3 inline-block cursor-default opacity-70 group-hover:opacity-100 transition-opacity" />
+      <span className="pointer-events-none absolute bottom-full mb-1.5 left-0 w-72 bg-black text-white text-[10px] leading-relaxed font-normal normal-case tracking-normal px-2 py-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity z-30 whitespace-normal">
+        {lines.map((line, i) => (
+          <span key={i}>{line}{i < lines.length - 1 && <br />}</span>
+        ))}
+      </span>
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // ELSTER-style VAT row — line | description | base | tax
 // ---------------------------------------------------------------------------
-function VatRow({ line, label, sublabel, base, tax, bold }: {
+function VatRow({ line, label, sublabel, base, tax, bold, tip }: {
   line?:     string;
   label:     string;
   sublabel?: string;
   base?:     string;
   tax?:      string;
   bold?:     boolean;
+  tip?:      React.ReactNode;
 }) {
   const textCls = bold ? "font-bold text-black" : "text-black/70";
   return (
@@ -134,7 +152,7 @@ function VatRow({ line, label, sublabel, base, tax, bold }: {
         {line ?? ""}
       </td>
       <td className={`py-1.5 text-xs ${textCls} flex-1`}>
-        {label}
+        <span className="inline-flex items-center gap-0">{label}{tip}</span>
         {sublabel && <span className="block text-[10px] text-black/70 font-normal">{sublabel}</span>}
       </td>
       <td className={`py-1.5 text-right font-mono text-xs ${textCls} whitespace-nowrap pl-6 w-28`}>
@@ -663,8 +681,9 @@ function UStVAPanel({ receipts, period }: { receipts: Receipt[]; period: PeriodF
             </thead>
             <tbody>
               <tr><td colSpan={4} className="pt-3 pb-1">
-                <span className="text-[10px] font-black uppercase tracking-wider text-black">
+                <span className="inline-flex items-center gap-0 text-[10px] font-black uppercase tracking-wider text-black">
                   {t("dashboard.vat_taxable_supplies")}
+                  <ElsterTip lines={[t("dashboard.elster_tip_taxable_supplies")]} />
                 </span>
               </td></tr>
               <VatRow line="81" label={t("dashboard.vat_line_19")}
@@ -682,12 +701,14 @@ function UStVAPanel({ receipts, period }: { receipts: Receipt[]; period: PeriodF
                 </span>
               </td></tr>
               <VatRow line="66" label={t("dashboard.vat_input_label")}
-                tax={fmt(inputVat)} />
+                tax={fmt(inputVat)}
+                tip={<ElsterTip lines={[t("dashboard.elster_tip_line66_1"), t("dashboard.elster_tip_line66_2")]} />} />
               <tr className="border-t-2 border-amber-400">
                 <td className="pt-3 pb-2 pr-3 text-[11px] font-mono font-bold text-black w-8">83</td>
                 <td className="pt-3 pb-2">
-                  <span className="text-xs font-bold text-black">
+                  <span className="inline-flex items-center gap-0 text-xs font-bold text-black">
                     {netLiability >= 0 ? t("dashboard.vat_payable_label") : t("dashboard.vat_refund_label")}
+                    <ElsterTip lines={[t("dashboard.elster_tip_line83")]} />
                   </span>
                   <span className="block text-[10px] text-black/70 font-normal">
                     {netLiability >= 0 ? t("dashboard.vat_payable_sub") : t("dashboard.vat_refund_sub")}
@@ -780,49 +801,50 @@ function UStErkPanel({ allReceipts, period }: { allReceipts: Receipt[]; period: 
             </thead>
             <tbody>
               <tr><td colSpan={4} className="pt-3 pb-1">
-                <span className="text-[10px] font-black uppercase tracking-wider text-black">
+                <span className="inline-flex items-center gap-0 text-[10px] font-black uppercase tracking-wider text-black">
                   {t("dashboard.vat_taxable_supplies")}
+                  <ElsterTip lines={[t("dashboard.elster_tip_taxable_supplies_uste")]} />
                 </span>
               </td></tr>
-              <VatRow line="81" label={t("dashboard.vat_line_19")}
+              <VatRow label={t("dashboard.vat_line_19")}
                 base={fmt(salesByRate["19"]?.net ?? 0)}
-                tax={fmt(salesByRate["19"]?.vat ?? 0)} />
-              <VatRow line="86" label={t("dashboard.vat_line_7")}
+                tax={fmt(salesByRate["19"]?.vat ?? 0)}
+                tip={<ElsterTip lines={[t("dashboard.elster_tip_uste_line22")]} />} />
+              <VatRow label={t("dashboard.vat_line_7")}
                 base={fmt(salesByRate["7"]?.net ?? 0)}
-                tax={fmt(salesByRate["7"]?.vat ?? 0)} />
-              <VatRow line="87" label={t("dashboard.vat_line_0")}
+                tax={fmt(salesByRate["7"]?.vat ?? 0)}
+                tip={<ElsterTip lines={[t("dashboard.elster_tip_uste_line25")]} />} />
+              <VatRow label={t("dashboard.vat_line_0")}
                 base={fmt(salesByRate["0"]?.net ?? 0)}
-                tax={fmt(salesByRate["0"]?.vat ?? 0)} />
+                tax={fmt(salesByRate["0"]?.vat ?? 0)}
+                tip={<ElsterTip lines={[t("dashboard.elster_tip_uste_line28")]} />} />
               <tr><td colSpan={4} className="pt-4 pb-1">
                 <span className="text-[10px] font-black uppercase tracking-wider text-black">
                   {t("dashboard.vat_input_section")}
                 </span>
               </td></tr>
-              <VatRow line="122" label={t("dashboard.uste_input_regular_label")}
-                tax={fmt(regularInputVat)} />
+              <VatRow label={t("dashboard.uste_input_regular_label")}
+                tax={fmt(regularInputVat)}
+                tip={<ElsterTip lines={[t("dashboard.elster_tip_uste_line79")]} />} />
               {einfuhrInputVat > 0 && (
-                <VatRow line="124" label={t("dashboard.vat_einfuhr_label")}
+                <VatRow label={t("dashboard.vat_einfuhr_label")}
                   tax={fmt(einfuhrInputVat)} />
               )}
               {einfuhrInputVat > 0 && (
-                <VatRow line="131" label={t("dashboard.uste_input_sum_label")} bold
+                <VatRow label={t("dashboard.uste_input_sum_label")} bold
                   tax={fmt(inputVat)} />
               )}
-              <tr className="border-t-2 border-amber-400">
-                <td className="pt-3 pb-2 pr-3 text-[11px] font-mono font-bold text-black w-8">83</td>
-                <td className="pt-3 pb-2">
-                  <span className="text-xs font-bold text-black">
-                    {netLiability >= 0 ? t("dashboard.vat_payable_label") : t("dashboard.vat_refund_label")}
-                  </span>
-                  <span className="block text-[10px] text-black/70 font-normal">
-                    {netLiability >= 0 ? t("dashboard.uste_payable_sub") : t("dashboard.uste_refund_sub")}
-                  </span>
-                </td>
-                <td />
-                <td className="pt-3 pb-2 text-right font-mono text-sm font-black text-black whitespace-nowrap pl-4 w-28">
-                  {netLiability < 0 ? "−" : ""}{fmt(Math.abs(netLiability))}
-                </td>
-              </tr>
+              <tr><td colSpan={4} className="pt-4 pb-1">
+                <span className="text-[10px] font-black uppercase tracking-wider text-black">
+                  {t("dashboard.uste_calculation_section")}
+                </span>
+              </td></tr>
+              <VatRow label={t("dashboard.uste_prepayment_soll_label")}
+                tax={`${netLiability < 0 ? "−" : ""}${fmt(Math.abs(netLiability))}`}
+                tip={<ElsterTip lines={[t("dashboard.elster_tip_uste_line119")]} />} />
+              <VatRow label={t("dashboard.uste_final_balance_label")} bold
+                tax={fmt(0)}
+                tip={<ElsterTip lines={[t("dashboard.elster_tip_uste_line120")]} />} />
             </tbody>
           </table>
 
