@@ -56,13 +56,14 @@ function Tip({ label, children, pos = "bottom" }: {
 // ---------------------------------------------------------------------------
 // FieldRow
 // ---------------------------------------------------------------------------
-function FieldRow({ label, value, editing, inputValue, onInput, placeholder }: {
+function FieldRow({ label, value, editing, inputValue, onInput, placeholder, labelWidth }: {
   label: string; value: React.ReactNode; editing?: boolean;
   inputValue?: string; onInput?: (v: string) => void; placeholder?: string;
+  labelWidth?: string;
 }) {
   return (
     <div className="flex items-start justify-between gap-3 py-2 border-b border-black/10 last:border-0">
-      <span className="text-xs text-black/50 font-bold uppercase tracking-wider shrink-0 w-28 pt-0.5">{label}</span>
+      <span className={`text-xs text-black/50 font-bold uppercase tracking-wider shrink-0 pt-0.5 ${labelWidth ?? "w-28"}`}>{label}</span>
       {editing && onInput != null ? (
         <input value={inputValue ?? ""} placeholder={placeholder} onChange={(e) => onInput(e.target.value)}
           className="flex-1 min-w-0 text-xs text-black font-mono bg-amber-50 border border-amber-300 rounded px-2 py-1 outline-none focus:border-amber-500" />
@@ -1615,6 +1616,19 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
                 editing={editing} inputValue={draft.vat_amount}
                 onInput={(v) => setDraft((d) => ({ ...d, vat_amount: v }))} />
             </>)}
+            {/* Einfuhrumsatzsteuer — edit mode (purchases only) */}
+            {editing && draft.receipt_type === "purchase" && (
+              <FieldRow
+                label={t("preview.field_einfuhr_vat")}
+                value=""
+                editing={true}
+                inputValue={draft.einfuhr_vat}
+                onInput={(v) => setDraft((d) => ({ ...d, einfuhr_vat: v }))}
+                placeholder="0.00"
+                labelWidth="w-50"
+              />
+            )}
+
             <FieldRow label={t("preview.field_net")} value={cvt(
               editing && splitVat && vatSplitDrafts.length > 0
                 ? vatSplitDrafts.reduce((sum, s) => sum + (parseDecimal(s.net_amount) || 0), 0)
@@ -1672,18 +1686,6 @@ export default function PreviewPanel({ receipt, apiBase, dbPath, onSaved }: Prop
                   })()}
                 </div>
               </div>
-            )}
-
-            {/* Einfuhrumsatzsteuer — edit mode (purchases only) */}
-            {editing && draft.receipt_type === "purchase" && (
-              <FieldRow
-                label={t("preview.field_einfuhr_vat")}
-                value=""
-                editing={true}
-                inputValue={draft.einfuhr_vat}
-                onInput={(v) => setDraft((d) => ({ ...d, einfuhr_vat: v }))}
-                placeholder="0.00"
-              />
             )}
 
             {/* Private Use — display mode (purchases with share > 0 only) */}
