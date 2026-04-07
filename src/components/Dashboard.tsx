@@ -918,31 +918,101 @@ function GewStPanel({ allReceipts, period, taxpayer, onEditTaxpayer }: {
             )}
           </div>
 
-          {/* Computation table */}
-          <table className="w-full text-xs font-mono border-collapse">
-            <tbody>
-              <tr className="border-b border-amber-100">
-                <td className="py-1.5 text-black">{t("dashboard.gewst_gewerbeertrag")}</td>
-                <td className="py-1.5 text-right text-black">{fE(gewerbeertrag)}</td>
-              </tr>
-              <tr className="border-b border-amber-100">
-                <td className="py-1.5 text-black/70 pl-4">{t("dashboard.gewst_rounded")}</td>
-                <td className="py-1.5 text-right text-black/70">{fE(gewerbeertragRounded)}</td>
-              </tr>
-              <tr className="border-b border-amber-100">
-                <td className="py-1.5 text-black">× {t("dashboard.gewst_steuermesszahl")} (3,5 %)</td>
-                <td className="py-1.5 text-right text-black">{fE(steuermessbetrag)}</td>
-              </tr>
-              <tr className="border-t-2 border-amber-300">
-                <td className="py-2 font-black text-black text-sm">
-                  × {t("dashboard.gewst_hebesatz")} ({hebesatz} %) = {t("dashboard.gewst_gewerbesteuer")}
-                </td>
-                <td className={`py-2 text-right font-black text-sm ${gewerbesteuer === 0 ? "text-black/60" : "text-black"}`}>
-                  {fE(gewerbesteuer)}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          {/* Allgemeine Angaben */}
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] font-black uppercase tracking-wider text-black">{t("dashboard.gewst_allgemeine_angaben")}</span>
+            <table className="w-full text-xs font-mono border-collapse">
+              <tbody>
+                <tr className="border-b border-amber-100">
+                  <td className="py-1 text-black/40 text-[10px] w-8">3</td>
+                  <td className="py-1 text-black/70">{t("dashboard.gewst_firma")}</td>
+                  <td className="py-1 text-right text-black font-bold">{taxpayer?.name || "—"}</td>
+                </tr>
+                <tr className="border-b border-amber-100">
+                  <td className="py-1 text-black/40 text-[10px] w-8">4</td>
+                  <td className="py-1 text-black/70">{t("dashboard.gewst_gegenstand")}</td>
+                  <td className="py-1 text-right text-black">{taxpayer?.gegenstand || "—"}</td>
+                </tr>
+                <tr className="border-b border-amber-100">
+                  <td className="py-1 text-black/40 text-[10px] w-8">14</td>
+                  <td className="py-1 text-black/70">{t("dashboard.gewst_rechtsform")}</td>
+                  <td className="py-1 text-right text-black">{taxpayer?.rechtsform || "GmbH"}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Angaben zur Betriebsstätte */}
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] font-black uppercase tracking-wider text-black">{t("dashboard.gewst_betriebsstaette")}</span>
+            <table className="w-full text-xs font-mono border-collapse">
+              <tbody>
+                {(
+                  [
+                    [26, "gewst_mehrere_gemeinden",   "betriebsstaette_mehrere"],
+                    [27, "gewst_erstreckt_gemeinden", "betriebsstaette_erstreckt"],
+                    [28, "gewst_verlegt",             "betriebsstaette_verlegt"],
+                  ] as [number, string, keyof TaxpayerProfile][]
+                ).map(([zeile, labelKey, field]) => {
+                  const val = taxpayer?.[field];
+                  const jaOrNein = val ? "Ja" : "Nein";
+                  return (
+                    <tr key={zeile} className="border-b border-amber-100">
+                      <td className="py-1 text-black/40 text-[10px] w-8">{zeile}</td>
+                      <td className="py-1 text-black/70">{t(`dashboard.${labelKey}`)}</td>
+                      <td className="py-1 text-right">
+                        <span className={`font-bold ${val ? "text-amber-700" : "text-black"}`}>{jaOrNein}</span>
+                        {onEditTaxpayer && <button onClick={onEditTaxpayer} className="ml-2 text-[9px] text-black/40 underline hover:text-amber-700">✎</button>}
+                      </td>
+                    </tr>
+                  );
+                })}
+                <tr className="border-b border-amber-100">
+                  <td className="py-1 text-black/40 text-[10px] w-8">31</td>
+                  <td className="py-1 text-black/70">{t("dashboard.gewst_plz")}</td>
+                  <td className="py-1 text-right text-black">{taxpayer?.postcode || "—"}</td>
+                </tr>
+                <tr className="border-b border-amber-100">
+                  <td className="py-1 text-black/40 text-[10px] w-8">32</td>
+                  <td className="py-1 text-black/70">{t("dashboard.gewst_ort")}</td>
+                  <td className="py-1 text-right text-black">{taxpayer?.city || "—"}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Gewinn aus Gewerbebetrieb + computation */}
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] font-black uppercase tracking-wider text-black">{t("dashboard.gewst_gewinn_section")}</span>
+            <table className="w-full text-xs font-mono border-collapse">
+              <tbody>
+                <tr className="border-b border-amber-100">
+                  <td className="py-1.5 text-black/40 text-[10px] w-8">39</td>
+                  <td className="py-1.5 text-black">{t("dashboard.gewst_gewerbeertrag")}</td>
+                  <td className="py-1.5 text-right text-black">{fE(gewerbeertrag)}</td>
+                </tr>
+                <tr className="border-b border-amber-100">
+                  <td className="py-1.5 w-8" />
+                  <td className="py-1.5 text-black/70 pl-4">{t("dashboard.gewst_rounded")}</td>
+                  <td className="py-1.5 text-right text-black/70">{fE(gewerbeertragRounded)}</td>
+                </tr>
+                <tr className="border-b border-amber-100">
+                  <td className="py-1.5 w-8" />
+                  <td className="py-1.5 text-black">× {t("dashboard.gewst_steuermesszahl")} (3,5 %)</td>
+                  <td className="py-1.5 text-right text-black">{fE(steuermessbetrag)}</td>
+                </tr>
+                <tr className="border-t-2 border-amber-300">
+                  <td className="py-2 w-8" />
+                  <td className="py-2 font-black text-black text-sm">
+                    × {t("dashboard.gewst_hebesatz")} ({hebesatz} %) = {t("dashboard.gewst_gewerbesteuer")}
+                  </td>
+                  <td className={`py-2 text-right font-black text-sm ${gewerbesteuer === 0 ? "text-black/60" : "text-black"}`}>
+                    {fE(gewerbesteuer)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
           {gewerbeertrag <= 0 && (
             <div className="bg-amber-50 border border-amber-300 rounded p-2 text-[11px] font-mono text-black/70">

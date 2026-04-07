@@ -42,6 +42,12 @@ export type TaxpayerProfile = {
   stammkapital?:  number | null;
   eingezahlt?:    number | null;
   hebesatz?:      number | null; // Gewerbesteuer Hebesatz (%)
+  gegenstand?:    string | null;  // Gegenstand des Unternehmens (GewSt 1A Zeile 4)
+  rechtsform?:    string | null;  // Rechtsform (GewSt 1A Zeile 14)
+  // Betriebsstätte flags — GewSt 1A Zeilen 26/27/28
+  betriebsstaette_mehrere?:  boolean | null; // Z. 26 — Betriebsstätten in mehreren Gemeinden
+  betriebsstaette_erstreckt?: boolean | null; // Z. 27 — erstreckt sich über mehrere Gemeinden
+  betriebsstaette_verlegt?:  boolean | null; // Z. 28 — einzige Betriebsstätte verlegt
 };
 
 export type ReceiptItem = {
@@ -180,6 +186,11 @@ export function TaxpayerModal({ initial, onSave, onClear, onClose }: {
     city:               initial?.city               ?? "",
     state:              initial?.state              ?? "",
     country:            initial?.country            ?? "",
+    gegenstand:         initial?.gegenstand         ?? "",
+    rechtsform:         initial?.rechtsform         ?? "",
+    betriebsstaette_mehrere:   initial?.betriebsstaette_mehrere   ?? false,
+    betriebsstaette_erstreckt: initial?.betriebsstaette_erstreckt ?? false,
+    betriebsstaette_verlegt:   initial?.betriebsstaette_verlegt   ?? false,
   });
   // String inputs for numeric fields (empty string ⇒ null)
   const [numForm, setNumForm] = useState({
@@ -206,6 +217,11 @@ export function TaxpayerModal({ initial, onSave, onClear, onClose }: {
       stammkapital:  parse(numForm.stammkapital),
       eingezahlt:    parse(numForm.eingezahlt),
       hebesatz:      parse(numForm.hebesatz),
+      gegenstand:    form.gegenstand || null,
+      rechtsform:    form.rechtsform || null,
+      betriebsstaette_mehrere:   form.betriebsstaette_mehrere   ?? false,
+      betriebsstaette_erstreckt: form.betriebsstaette_erstreckt ?? false,
+      betriebsstaette_verlegt:   form.betriebsstaette_verlegt   ?? false,
     });
   };
 
@@ -296,6 +312,61 @@ export function TaxpayerModal({ initial, onSave, onClear, onClose }: {
           <span className="text-[10px] text-black/40 font-bold uppercase tracking-wider">
             {t("sidebar.taxpayer_company_section")}
           </span>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider">
+              {t("sidebar.taxpayer_gegenstand")}
+            </label>
+            <input
+              type="text"
+              value={form.gegenstand ?? ""}
+              onChange={set("gegenstand")}
+              className="border border-black/20 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-amber-400"
+              placeholder={t("sidebar.taxpayer_gegenstand")}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider">
+              {t("sidebar.taxpayer_rechtsform")}
+            </label>
+            <input
+              type="text"
+              value={form.rechtsform ?? ""}
+              onChange={set("rechtsform")}
+              className="border border-black/20 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-amber-400"
+              placeholder="GmbH"
+            />
+          </div>
+          {/* Betriebsstätte flags Z.26/27/28 */}
+          <div className="flex flex-col gap-1.5 pt-1 border-t border-black/5">
+            <span className="text-[10px] text-black/40 font-bold uppercase tracking-wider">
+              {t("sidebar.taxpayer_betriebsstaette_section")}
+            </span>
+            {(
+              [
+                ["betriebsstaette_mehrere",   "sidebar.taxpayer_bs_mehrere"],
+                ["betriebsstaette_erstreckt", "sidebar.taxpayer_bs_erstreckt"],
+                ["betriebsstaette_verlegt",   "sidebar.taxpayer_bs_verlegt"],
+              ] as [keyof TaxpayerProfile, string][]
+            ).map(([key, labelKey]) => (
+              <div key={key} className="flex items-center justify-between gap-2">
+                <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider flex-1 leading-tight">
+                  {t(labelKey)}
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setForm((prev) => ({ ...prev, [key]: !prev[key] }))}
+                  className={`text-xs font-black px-3 py-0.5 rounded border-2 transition-colors shrink-0 ${
+                    form[key]
+                      ? "bg-amber-400 border-amber-500 text-black"
+                      : "bg-white border-black/20 text-black/50"
+                  }`}
+                >
+                  {form[key] ? "Ja" : "Nein"}
+                </button>
+              </div>
+            ))}
+          </div>
+
           <div className="flex flex-col gap-1">
             <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider">
               {t("sidebar.taxpayer_gruendungsjahr")}
