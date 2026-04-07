@@ -199,6 +199,8 @@ export function TaxpayerModal({ initial, onSave, onClear, onClose }: {
     eingezahlt:    initial?.eingezahlt    != null ? String(initial.eingezahlt)    : "",
     hebesatz:      initial?.hebesatz      != null ? String(initial.hebesatz)      : "",
   });
+  const [companyOpen, setCompanyOpen] = useState(false);
+
   const set = (key: keyof TaxpayerProfile) =>
     (e: React.ChangeEvent<HTMLInputElement>) =>
       setForm((prev) => ({ ...prev, [key]: e.target.value }));
@@ -307,123 +309,134 @@ export function TaxpayerModal({ initial, onSave, onClear, onClose }: {
           </div>
         </div>
 
-        {/* GmbH / Company facts */}
+        {/* GmbH / Company facts — collapsible */}
         <div className="flex flex-col gap-1.5 pt-1 border-t border-black/5">
-          <span className="text-[10px] text-black/40 font-bold uppercase tracking-wider">
-            {t("sidebar.taxpayer_company_section")}
-          </span>
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider">
-              {t("sidebar.taxpayer_gegenstand")}
-            </label>
-            <input
-              type="text"
-              value={form.gegenstand ?? ""}
-              onChange={set("gegenstand")}
-              className="border border-black/20 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-amber-400"
-              placeholder={t("sidebar.taxpayer_gegenstand")}
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider">
-              {t("sidebar.taxpayer_rechtsform")}
-            </label>
-            <input
-              type="text"
-              value={form.rechtsform ?? ""}
-              onChange={set("rechtsform")}
-              className="border border-black/20 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-amber-400"
-              placeholder="GmbH"
-            />
-          </div>
-          {/* Betriebsstätte flags Z.26/27/28 */}
-          <div className="flex flex-col gap-1.5 pt-1 border-t border-black/5">
-            <span className="text-[10px] text-black/40 font-bold uppercase tracking-wider">
-              {t("sidebar.taxpayer_betriebsstaette_section")}
+          <button
+            type="button"
+            onClick={() => setCompanyOpen((o) => !o)}
+            className="flex items-center justify-between w-full text-left group"
+          >
+            <span className="text-[10px] text-black/40 font-bold uppercase tracking-wider group-hover:text-black/60 transition-colors">
+              {t("sidebar.taxpayer_company_section")}
             </span>
-            {(
-              [
-                ["betriebsstaette_mehrere",   "sidebar.taxpayer_bs_mehrere"],
-                ["betriebsstaette_erstreckt", "sidebar.taxpayer_bs_erstreckt"],
-                ["betriebsstaette_verlegt",   "sidebar.taxpayer_bs_verlegt"],
-              ] as [keyof TaxpayerProfile, string][]
-            ).map(([key, labelKey]) => (
-              <div key={key} className="flex items-center justify-between gap-2">
-                <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider flex-1 leading-tight">
-                  {t(labelKey)}
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setForm((prev) => ({ ...prev, [key]: !prev[key] }))}
-                  className={`text-xs font-black px-3 py-0.5 rounded border-2 transition-colors shrink-0 ${
-                    form[key]
-                      ? "bg-amber-400 border-amber-500 text-black"
-                      : "bg-white border-black/20 text-black/50"
-                  }`}
-                >
-                  {form[key] ? "Ja" : "Nein"}
-                </button>
-              </div>
-            ))}
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider">
-              {t("sidebar.taxpayer_gruendungsjahr")}
-            </label>
-            <input
-              type="number"
-              value={numForm.gründungsjahr}
-              onChange={setNum("gründungsjahr")}
-              className="border border-black/20 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-amber-400"
-              placeholder={String(new Date().getFullYear())}
-              min={1900}
-              max={2100}
+            <IconChevronDown
+              className={`text-black/30 transition-transform ${companyOpen ? "rotate-180" : ""}`}
+              style={{ width: 14, height: 14 }}
             />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider">
-              {t("sidebar.taxpayer_stammkapital_field")}
-            </label>
-            <input
-              type="number"
-              value={numForm.stammkapital}
-              onChange={setNum("stammkapital")}
-              className="border border-black/20 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-amber-400"
-              placeholder="25000"
-              min={0}
-              step={0.01}
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider">
-              {t("sidebar.taxpayer_eingezahlt_field")}
-            </label>
-            <input
-              type="number"
-              value={numForm.eingezahlt}
-              onChange={setNum("eingezahlt")}
-              className="border border-black/20 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-amber-400"
-              placeholder="12500"
-              min={0}
-              step={0.01}
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider">
-              {t("sidebar.taxpayer_hebesatz_field")}
-            </label>
-            <input
-              type="number"
-              value={numForm.hebesatz}
-              onChange={setNum("hebesatz")}
-              className="border border-black/20 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-amber-400"
-              placeholder="400"
-              min={200}
-              max={900}
-              step={50}
-            />
-          </div>
+          </button>
+          {companyOpen && <>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider">
+                {t("sidebar.taxpayer_gegenstand")}
+              </label>
+              <input
+                type="text"
+                value={form.gegenstand ?? ""}
+                onChange={set("gegenstand")}
+                className="border border-black/20 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-amber-400"
+                placeholder={t("sidebar.taxpayer_gegenstand")}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider">
+                {t("sidebar.taxpayer_rechtsform")}
+              </label>
+              <input
+                type="text"
+                value={form.rechtsform ?? ""}
+                onChange={set("rechtsform")}
+                className="border border-black/20 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-amber-400"
+                placeholder="GmbH"
+              />
+            </div>
+            {/* Betriebsstätte flags Z.26/27/28 */}
+            <div className="flex flex-col gap-1.5 pt-1 border-t border-black/5">
+              <span className="text-[10px] text-black/40 font-bold uppercase tracking-wider">
+                {t("sidebar.taxpayer_betriebsstaette_section")}
+              </span>
+              {(
+                [
+                  ["betriebsstaette_mehrere",   "sidebar.taxpayer_bs_mehrere"],
+                  ["betriebsstaette_erstreckt", "sidebar.taxpayer_bs_erstreckt"],
+                  ["betriebsstaette_verlegt",   "sidebar.taxpayer_bs_verlegt"],
+                ] as [keyof TaxpayerProfile, string][]
+              ).map(([key, labelKey]) => (
+                <div key={key} className="flex items-center justify-between gap-2">
+                  <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider flex-1 leading-tight">
+                    {t(labelKey)}
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setForm((prev) => ({ ...prev, [key]: !prev[key] }))}
+                    className={`text-xs font-black px-3 py-0.5 rounded border-2 transition-colors shrink-0 ${
+                      form[key]
+                        ? "bg-amber-400 border-amber-500 text-black"
+                        : "bg-white border-black/20 text-black/50"
+                    }`}
+                  >
+                    {form[key] ? "Ja" : "Nein"}
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider">
+                {t("sidebar.taxpayer_gruendungsjahr")}
+              </label>
+              <input
+                type="number"
+                value={numForm.gründungsjahr}
+                onChange={setNum("gründungsjahr")}
+                className="border border-black/20 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-amber-400"
+                placeholder={String(new Date().getFullYear())}
+                min={1900}
+                max={2100}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider">
+                {t("sidebar.taxpayer_stammkapital_field")}
+              </label>
+              <input
+                type="number"
+                value={numForm.stammkapital}
+                onChange={setNum("stammkapital")}
+                className="border border-black/20 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-amber-400"
+                placeholder="25000"
+                min={0}
+                step={0.01}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider">
+                {t("sidebar.taxpayer_eingezahlt_field")}
+              </label>
+              <input
+                type="number"
+                value={numForm.eingezahlt}
+                onChange={setNum("eingezahlt")}
+                className="border border-black/20 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-amber-400"
+                placeholder="12500"
+                min={0}
+                step={0.01}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider">
+                {t("sidebar.taxpayer_hebesatz_field")}
+              </label>
+              <input
+                type="number"
+                value={numForm.hebesatz}
+                onChange={setNum("hebesatz")}
+                className="border border-black/20 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-amber-400"
+                placeholder="400"
+                min={200}
+                max={900}
+                step={50}
+              />
+            </div>
+          </>}
         </div>
 
         <div className="flex gap-2 mt-1">
