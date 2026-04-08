@@ -766,7 +766,7 @@ function UStErkPanel({ allReceipts, period }: { allReceipts: Receipt[]; period: 
         <div>
           <h3 className="text-black text-sm font-black tracking-wide">{t("dashboard.uste_title")}</h3>
           <p className="text-[10px] text-black font-mono mt-0.5">
-            {t("dashboard.decl_annual")} · <LawLink law="§ 18 UStG" href="https://www.gesetze-im-internet.de/ustg_1980/__18.html" /> · {year}
+            {t("dashboard.decl_annual")} · <LawLink law="§ 18 UStG" href="https://www.gesetze-im-internet.de/ustg_1980/__18.html" /> · USt 2 A · {year}
           </p>
         </div>
         <IconChevronDown className={`w-4 h-4 text-black shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
@@ -906,7 +906,7 @@ function GewStPanel({ allReceipts, period, taxpayer, onEditTaxpayer }: {
         <div>
           <h3 className="text-black text-sm font-black tracking-wide">{t("dashboard.gewst_title")}</h3>
           <p className="text-[10px] text-black font-mono mt-0.5">
-            {t("dashboard.decl_annual")} · <LawLink law="§§ 14 ff. GewStG" href="https://www.gesetze-im-internet.de/gewstg/__14.html" /> · {year}
+            {t("dashboard.decl_annual")} · <LawLink law="§§ 14 ff. GewStG" href="https://www.gesetze-im-internet.de/gewstg/__14.html" /> · GewSt 1A · {year}
           </p>
         </div>
         <IconChevronDown className={`w-4 h-4 text-black shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
