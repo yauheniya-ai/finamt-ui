@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { IconChevronDown } from "../../constants/icons";
-import type { Receipt, PeriodFilter } from "../Sidebar";
+import type { Receipt, PeriodFilter, TaxpayerProfile } from "../Sidebar";
 import { CASHFLOW_ONLY_CATS } from "../Sidebar";
 import { LawLink, ElsterTip } from "./shared";
 
@@ -52,7 +52,12 @@ function KRow({
   );
 }
 
-export function KStPanel({ allReceipts, period }: { allReceipts: Receipt[]; period: PeriodFilter }) {
+export function KStPanel({ allReceipts, period, taxpayer, onEditTaxpayer }: {
+  allReceipts:     Receipt[];
+  period:          PeriodFilter;
+  taxpayer?:       TaxpayerProfile | null;
+  onEditTaxpayer?: () => void;
+}) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
 
@@ -84,15 +89,45 @@ export function KStPanel({ allReceipts, period }: { allReceipts: Receipt[]; peri
   const einkommen     = gesamtbetrag - verlustabzug - spendenabzug;
   const zve           = einkommen; // no Freibetrag for GmbH
 
-  // KSt 1 — Steuerberechnung (also whole euros)
-  const koerperschaftsteuer = Math.round(Math.max(zve, 0) * 0.15); // § 23 KStG
-  const solidaritaet        = Math.round(koerperschaftsteuer * 0.055); // SolZG
-  const gesamtbelastung     = koerperschaftsteuer + solidaritaet;
+  // KSt liability (kept for potential future use / summary badge)
+  // const koerperschaftsteuer = Math.round(Math.max(zve, 0) * 0.15);
+  // const solidaritaet        = Math.round(koerperschaftsteuer * 0.055);
 
   // Anlage Verluste — triggered when Gesamtbetrag der Einkünfte is negative (§ 10d EStG)
   const verlustJahr    = gesamtbetrag < 0 ? Math.abs(gesamtbetrag) : 0;
   const anfangsbestand = 0; // prior-year Endbestand — manual entry in ELSTER
   const endbestand     = anfangsbestand + verlustJahr;
+
+  // Anlage KSt 1 F — Einlagekonto + ausschüttbarer Gewinn
+  const nennkapital        = Math.round(taxpayer?.stammkapital ?? 0);
+  // Steuerliches Einlagekonto (§ 27 KStG) = 0 for a standard GmbH:
+  // eingezahlt is a partial Nennkapital payment, NOT an additional equity contribution beyond Stammkapital.
+  // Only Agios / Zuzahlungen above registered Stammkapital would be recorded here.
+  const einlagekontoAnfang = 0;
+  // Eigenkapital (Steuerbilanz, Jahresende) = Stammkapital + Σ Steuerbilanzgewinn aller Jahre
+  // von Gründung bis einschließlich VZ — not just the current year!
+  const gründungsjahr = taxpayer?.gründungsjahr ?? year;
+  const netForYear = (y: number) => {
+    const recs = allReceipts.filter(
+      (r) => r.receipt_date?.startsWith(String(y)) && !CASHFLOW_ONLY_CATS.has(r.category)
+    );
+    const rev = recs.filter((r) => r.receipt_type === "sale").reduce((s, r) => {
+      const net = r.business_net ?? r.net_amount ?? ((r.total_amount ?? 0) / (1 + (r.vat_percentage ?? 19) / 100));
+      return s + net;
+    }, 0);
+    const exp = recs.filter((r) => r.receipt_type === "purchase").reduce((s, r) => {
+      const net = r.business_net ?? r.net_amount ?? ((r.total_amount ?? 0) / (1 + (r.vat_percentage ?? 19) / 100));
+      return s + net;
+    }, 0);
+    return rev - exp;
+  };
+  // Sum from founding year through (and including) this year
+  let cumulativeGewinn = 0;
+  for (let y = gründungsjahr; y <= year; y++) cumulativeGewinn += netForYear(y);
+  cumulativeGewinn = Math.round(cumulativeGewinn);
+  const eigenkapitalApprox = nennkapital + cumulativeGewinn;
+  // Z.20: Ausschüttbarer Gewinn = max(0, Eigenkapital − Nennkapital − pos. Einlagekonto)
+  const ausschuettbar      = Math.max(0, eigenkapitalApprox - nennkapital - einlagekontoAnfang);
 
   // Formatter for ELSTER whole-euro fields (no decimal separator)
   const fE = (n: number) =>
@@ -135,18 +170,106 @@ export function KStPanel({ allReceipts, period }: { allReceipts: Receipt[]; peri
             />
             <table className="w-full border-collapse">
               <tbody>
-                <KRow label={`${t("dashboard.kst_zve_label")} × ${t("dashboard.kst_rate")} (15 %)`} value={fE(koerperschaftsteuer)} />
+
+                {/* 1 — Allgemeine Angaben */}
+                <ZveSubHeader title={t("dashboard.kst_kst1_allgemein_title")} />
                 <KRow
-                  label={`+ ${t("dashboard.kst_solz")} (${t("dashboard.kst_solz_rate", { pct: "5,5" })})`}
-                  value={fE(solidaritaet)}
-                  indent
+                  label={t("dashboard.kst_kst1_z1_name")}
+                  value={taxpayer?.name ?? t("dashboard.kst_manual_entry")}
+                  dim={!taxpayer?.name}
                 />
-                <tr className="border-t-2 border-amber-300">
-                  <td className="py-2 text-sm font-black text-black font-mono">= {t("dashboard.kst_total")}</td>
-                  <td className={`py-2 text-right text-sm font-black font-mono whitespace-nowrap pl-6 w-36 ${gesamtbelastung === 0 ? "text-black/60" : "text-black"}`}>
-                    {fE(gesamtbelastung)}
-                  </td>
-                </tr>
+                <KRow
+                  label={t("dashboard.kst_kst1_z9_rechtsform")}
+                  value={taxpayer?.rechtsform ?? "—"}
+                  dim={!taxpayer?.rechtsform}
+                  tip={!taxpayer?.rechtsform ? <ElsterTip lines={[t("dashboard.kst_kst1_z9_note")]} /> : undefined}
+                />
+
+                {/* 3 — Steuerbefreiung */}
+                <ZveSubHeader title={t("dashboard.kst_kst1_steuerbefreiung_title")} />
+                <KRow
+                  label={t("dashboard.kst_kst1_z10")}
+                  value={t("dashboard.kst_leer_lassen")}
+                  dim
+                  tip={<ElsterTip lines={[
+                    t("dashboard.kst_kst1_z10_note"),
+                    t("dashboard.kst_kst1_z10_note_2"),
+                  ]} />}
+                />
+
+                {/* 5 — Wirtschaftsjahr */}
+                <ZveSubHeader title={t("dashboard.kst_kst1_wj_title")} />
+                <KRow
+                  label={t("dashboard.kst_kst1_z14_von")}
+                  value={`01.01.${year}`}
+                  tip={<ElsterTip lines={[t("dashboard.kst_kst1_z14_note")]} />}
+                />
+                <KRow
+                  label={t("dashboard.kst_kst1_z14_bis")}
+                  value={`31.12.${year}`}
+                />
+                {taxpayer?.gründungsjahr && (
+                  <KRow
+                    label={t("dashboard.kst_kst1_z14a")}
+                    value={t("dashboard.kst_kst1_ja")}
+                    tip={<ElsterTip lines={[t("dashboard.kst_kst1_z14a_note")]} />}
+                  />
+                )}
+
+                {/* 6 — Weitere Angaben + Erklärungen */}
+                <ZveSubHeader title={t("dashboard.kst_kst1_weitere_title")} />
+                <KRow
+                  label={t("dashboard.kst_kst1_z_organschaft")}
+                  value={t("dashboard.kst_kst1_nein")}
+                  dim
+                  tip={<ElsterTip lines={[
+                    t("dashboard.kst_kst1_z_organschaft_note"),
+                  ]} />}
+                />
+                <KRow
+                  label={t("dashboard.kst_kst1_z_einlagekonto")}
+                  value={t("dashboard.kst_kst1_ja")}
+                  tip={<ElsterTip lines={[
+                    t("dashboard.kst_kst1_z_einlagekonto_note"),
+                    t("dashboard.kst_kst1_z_einlagekonto_note_2"),
+                  ]} />}
+                />
+                <KRow
+                  label={t("dashboard.kst_kst1_z16")}
+                  value={t("dashboard.kst_kst1_nein")}
+                  dim
+                  tip={<ElsterTip lines={[t("dashboard.kst_kst1_z16_note")]} />}
+                />
+                <KRow
+                  label={t("dashboard.kst_kst1_z17")}
+                  value={t("dashboard.kst_kst1_nein_action")}
+                  tip={<ElsterTip lines={[
+                    t("dashboard.kst_kst1_z17_note"),
+                    t("dashboard.kst_kst1_z17_note_2"),
+                  ]} />}
+                />
+                <KRow
+                  label={t("dashboard.kst_kst1_z17a")}
+                  value={t("dashboard.kst_leer_lassen")}
+                  dim
+                  tip={<ElsterTip lines={[
+                    t("dashboard.kst_kst1_z17a_note"),
+                    t("dashboard.kst_kst1_z17a_note_2"),
+                  ]} />}
+                />
+
+                {/* 8 — Anteilseigner */}
+                <ZveSubHeader title={t("dashboard.kst_kst1_anteilseigner_title")} />
+                <KRow
+                  label={t("dashboard.kst_kst1_anteilseigner_row")}
+                  value={t("dashboard.kst_manual_entry")}
+                  dim
+                  tip={<ElsterTip lines={[
+                    t("dashboard.kst_kst1_anteilseigner_note"),
+                    t("dashboard.kst_kst1_anteilseigner_note_2"),
+                  ]} />}
+                />
+
               </tbody>
             </table>
           </div>
@@ -194,47 +317,7 @@ export function KStPanel({ allReceipts, period }: { allReceipts: Receipt[]; peri
           </div>
 
           {/* ── Anlage Verluste (shown when loss year) ─────────────────── */}
-          {gesamtbetrag < 0 && (
-            <div className="flex flex-col gap-2">
-              <AnlageHeader
-                title={t("dashboard.kst_anlage_verluste_title")}
-                law="§ 10d EStG"
-                href="https://www.gesetze-im-internet.de/estg/__10d.html"
-              />
-              <p className="text-[10px] font-mono text-black/50 leading-relaxed">{t("dashboard.kst_anlage_verluste_subtitle")}</p>
-              <table className="w-full border-collapse">
-                <tbody>
-                  <KRow
-                    label={t("dashboard.kst_vlv_anfangsbestand")}
-                    value={t("dashboard.kst_manual_zero")}
-                    dim
-                    tip={<ElsterTip lines={[
-                      t("dashboard.kst_vlv_anfangsbestand_note"),
-                      t("dashboard.kst_vlv_anfangsbestand_note_2"),
-                    ]} />}
-                  />
-                  <KRow
-                    label={t("dashboard.kst_vlv_verlust_jahr")}
-                    value={fE(verlustJahr)}
-                    tip={<ElsterTip lines={[t("dashboard.kst_vlv_verlust_jahr_note")]} />}
-                  />
-                  <tr className="border-t-2 border-amber-300">
-                    <td className="py-2 text-xs font-black text-black font-mono">{t("dashboard.kst_vlv_endbestand")}</td>
-                    <td className="py-2 text-right text-xs font-black font-mono whitespace-nowrap pl-6 w-36 text-black">
-                      {fE(endbestand)}
-                    </td>
-                  </tr>
-                  <KRow label={t("dashboard.kst_vlv_para8d")}          value="—" dim />
-                  <KRow label={t("dashboard.kst_vlv_beitrittsgebiet")} value="—" dim />
-                </tbody>
-              </table>
-              <div className="bg-amber-50 border border-amber-300 rounded p-2 text-[11px] font-mono text-black/70">
-                {t("dashboard.kst_vlv_endbestand_note")}
-              </div>
-            </div>
-          )}
-
-          {/* ── Anlage ZVE ─────────────────────────────────────────────── */}
+          {/* Anlage ZVE */}
           <div className="flex flex-col gap-2">
             <AnlageHeader
               title={t("dashboard.kst_anlage_zve_title")}
@@ -297,6 +380,280 @@ export function KStPanel({ allReceipts, period }: { allReceipts: Receipt[]; peri
 
               </tbody>
             </table>
+          </div>
+
+          {/* Anlage Verluste (shown when loss year) */}
+          {gesamtbetrag < 0 && (
+            <div className="flex flex-col gap-2">
+              <AnlageHeader
+                title={t("dashboard.kst_anlage_verluste_title")}
+                law="§ 10d EStG"
+                href="https://www.gesetze-im-internet.de/estg/__10d.html"
+              />
+              <p className="text-[10px] font-mono text-black/50 leading-relaxed">{t("dashboard.kst_anlage_verluste_subtitle")}</p>
+              <table className="w-full border-collapse">
+                <tbody>
+                  <KRow
+                    label={t("dashboard.kst_vlv_anfangsbestand")}
+                    value={t("dashboard.kst_manual_zero")}
+                    dim
+                    tip={<ElsterTip lines={[
+                      t("dashboard.kst_vlv_anfangsbestand_note"),
+                      t("dashboard.kst_vlv_anfangsbestand_note_2"),
+                    ]} />}
+                  />
+                  <KRow
+                    label={t("dashboard.kst_vlv_verlust_jahr")}
+                    value={fE(verlustJahr)}
+                    tip={<ElsterTip lines={[t("dashboard.kst_vlv_verlust_jahr_note")]} />}
+                  />
+                  <KRow
+                    label={t("dashboard.kst_vlv_z20_ruecktrag")}
+                    value={fE(0)}
+                    tip={<ElsterTip lines={[
+                      t("dashboard.kst_vlv_z20_note"),
+                      t("dashboard.kst_vlv_z20_note_2"),
+                    ]} />}
+                  />
+                  <tr className="border-t-2 border-amber-300">
+                    <td className="py-2 text-xs font-black text-black font-mono">{t("dashboard.kst_vlv_endbestand")}</td>
+                    <td className="py-2 text-right text-xs font-black font-mono whitespace-nowrap pl-6 w-36 text-black">
+                      {fE(endbestand)}
+                    </td>
+                  </tr>
+                  <KRow label={t("dashboard.kst_vlv_para8d")}          value="—" dim />
+                  <KRow label={t("dashboard.kst_vlv_beitrittsgebiet")} value="—" dim />
+                </tbody>
+              </table>
+              <div className="bg-amber-50 border border-amber-300 rounded p-2 text-[11px] font-mono text-black/70">
+                {t("dashboard.kst_vlv_endbestand_note")}
+              </div>
+            </div>
+          )}
+
+          {/* ── Anlage WA — Weitere Angaben / Anträge ───────────────────── */}
+          <div className="flex flex-col gap-2">
+            <AnlageHeader
+              title={t("dashboard.kst_anlage_wa_title")}
+              law="§ 31 KStG"
+              href="https://www.gesetze-im-internet.de/kstg_1977/__31.html"
+            />
+            <p className="text-[10px] font-mono text-black/50 leading-relaxed">{t("dashboard.kst_wa_required_note")}</p>
+            <table className="w-full border-collapse">
+              <tbody>
+                <KRow label={t("dashboard.kst_wa_row1")} value="—" dim
+                  tip={<ElsterTip lines={[
+                    t("dashboard.kst_wa_row1_note"),
+                    t("dashboard.kst_wa_row1_note_2"),
+                  ]} />
+                }
+                />
+                <KRow label={t("dashboard.kst_wa_row2")} value="—" dim />
+                <KRow label={t("dashboard.kst_wa_row3")} value="—" dim />
+                <KRow
+                  label={t("dashboard.kst_wa_row4")}
+                  value="—"
+                  dim
+                  tip={<ElsterTip lines={[
+                    t("dashboard.kst_wa_row4_note"),
+                    t("dashboard.kst_wa_row4_note_2"),
+                  ]} />}
+                />
+                <KRow label={t("dashboard.kst_wa_row5")} value="—" dim />
+                <KRow
+                  label={t("dashboard.kst_wa_row6")}
+                  value="—"
+                  dim
+                  tip={<ElsterTip lines={[
+                    t("dashboard.kst_wa_row6_note"),
+                    t("dashboard.kst_wa_row6_note_2"),
+                  ]} />}
+                />
+                <KRow label={t("dashboard.kst_wa_row7")}  value="—" dim />
+                <KRow label={t("dashboard.kst_wa_row8")}  value="—" dim />
+                <KRow label={t("dashboard.kst_wa_row9")}  value="—" dim />
+                <KRow label={t("dashboard.kst_wa_row10")} value="—" dim />
+              </tbody>
+            </table>
+            <div className="bg-amber-50 border border-amber-300 rounded p-2 text-[11px] font-mono text-black/70">
+              {t("dashboard.kst_wa_open_note")}
+            </div>
+          </div>
+
+          {/* ── Anlage KSt 1 F ─────────────────────────────────────── */}
+          <div className="flex flex-col gap-2">
+            <AnlageHeader
+              title={t("dashboard.kst_1f_title")}
+              law="§ 27 KStG"
+              href="https://www.gesetze-im-internet.de/kstg_1977/__27.html"
+            />
+            <p className="text-[10px] font-mono text-black/50 leading-relaxed">{t("dashboard.kst_1f_required_note")}</p>
+            <table className="w-full border-collapse">
+              <tbody>
+
+                {/* 1 — Allgemeine Angaben */}
+                <ZveSubHeader title={t("dashboard.kst_1f_s1_title")} />
+                {taxpayer?.name && (
+                  <KRow label={t("dashboard.gewst_firma")} value={taxpayer.name} />
+                )}
+                {taxpayer?.rechtsform && (
+                  <KRow label={t("dashboard.gewst_rechtsform")} value={taxpayer.rechtsform} />
+                )}
+                {taxpayer?.gründungsjahr && (
+                  <KRow label={t("dashboard.jab_gründungsjahr")} value={String(taxpayer.gründungsjahr)} />
+                )}
+                {nennkapital > 0 && (
+                  <KRow label={t("dashboard.kst_1f_stammkapital")} value={fE(nennkapital)}
+                    tip={<ElsterTip lines={[t("dashboard.kst_1f_stammkapital_note")]} />}
+                  />
+                )}
+                {!taxpayer?.name && (
+                  <KRow label={t("dashboard.kst_1f_s1_row")} value={t("dashboard.kst_manual_entry")} dim
+                    tip={<ElsterTip lines={[t("dashboard.kst_1f_s1_note")]} />}
+                  />
+                )}
+                {onEditTaxpayer && (
+                  <tr><td colSpan={2} className="py-1">
+                    <button onClick={onEditTaxpayer} className="text-[9px] font-bold text-black underline underline-offset-2 hover:text-amber-700">
+                      {t("sidebar.taxpayer_edit_btn")} →
+                    </button>
+                  </td></tr>
+                )}
+
+                {/* 2 — Gewinnausschüttungen / Leistungen */}
+                <ZveSubHeader title={t("dashboard.kst_1f_s2_title")} />
+                <KRow label={t("dashboard.kst_1f_s2_row")} value={t("dashboard.kst_manual_zero")} dim
+                  tip={<ElsterTip lines={[t("dashboard.kst_1f_s2_note"), t("dashboard.kst_1f_s2_note_2")]} />}
+                />
+
+                {/* 3 — Ausschüttbarer Gewinn */}
+                <ZveSubHeader title={t("dashboard.kst_1f_s3_title")} />
+                <KRow
+                  label={t("dashboard.kst_1f_s3_eigenkapital")}
+                  value={nennkapital > 0 ? `${fE(eigenkapitalApprox)} *` : t("dashboard.kst_manual_zero")}
+                  dim={nennkapital === 0}
+                  tip={<ElsterTip lines={[
+                    t("dashboard.kst_1f_s3_ek_note"),
+                    t("dashboard.kst_1f_s3_ek_note_2"),
+                    t("dashboard.kst_1f_s3_ek_note_3"),
+                  ]} />}
+                />
+                <KRow
+                  label={t("dashboard.kst_1f_s3_nennkapital")}
+                  value={nennkapital > 0 ? `− ${fE(nennkapital)}` : "—"}
+                  dim={nennkapital === 0}
+                />
+                <KRow
+                  label={t("dashboard.kst_1f_s3_einlagekonto")}
+                  value={einlagekontoAnfang > 0 ? `− ${fE(einlagekontoAnfang)}` : "—"}
+                  dim={einlagekontoAnfang === 0}                  tip={<ElsterTip lines={[
+                    t("dashboard.kst_1f_s3_ek19_note"),
+                    t("dashboard.kst_1f_s3_ek19_note_2"),
+                  ]} />}                />
+                <tr className="border-t-2 border-amber-300">
+                  <td className="py-2 text-xs font-black text-black font-mono">
+                    {t("dashboard.kst_1f_s3_result")}
+                    {nennkapital > 0 && <span className="text-black/40 text-[9px] ml-1">*</span>}
+                  </td>
+                  <td className={`py-2 text-right text-xs font-black font-mono whitespace-nowrap pl-6 w-36 ${nennkapital === 0 ? "text-black/40" : "text-black"}`}>
+                    {nennkapital > 0 ? fE(ausschuettbar) : t("dashboard.kst_manual_zero")}
+                  </td>
+                </tr>
+                {nennkapital > 0 && (
+                  <tr><td colSpan={2} className="py-0.5 text-[9px] font-mono text-black/40">
+                    * {t("dashboard.kst_1f_s3_approx_note")}
+                  </td></tr>
+                )}
+
+                {/* 4 — Mehr-/Minderabführungen § 27 Abs. 6 */}
+                <ZveSubHeader title={t("dashboard.kst_1f_s4_title")} />
+                <KRow label={t("dashboard.kst_1f_s4_row")} value="—" dim
+                  tip={<ElsterTip lines={[t("dashboard.kst_1f_s4_note")]} />}
+                />
+
+                {/* 5 — Einlagekonto (§ 27 Abs. 2) + Nennkapital aus Umwandlung (§ 28 Abs. 1) */}
+                <ZveSubHeader title={t("dashboard.kst_1f_s5_title")} />
+                <ZveSubHeader title={t("dashboard.kst_1f_s5_anfang_title")} />
+                {taxpayer?.gründungsjahr && (
+                  <KRow
+                    label={t("dashboard.kst_1f_eintrittsdatum")}
+                    value={`01.01.${taxpayer.gründungsjahr}`}
+                    tip={<ElsterTip lines={[
+                      t("dashboard.kst_1f_eintrittsdatum_note"),
+                      t("dashboard.kst_1f_eintrittsdatum_note_2"),
+                    ]} />}
+                  />
+                )}
+                <KRow
+                  label={t("dashboard.kst_1f_z40")}
+                  value={taxpayer?.gründungsjahr ? fE(einlagekontoAnfang) : t("dashboard.kst_kst1_na")}
+                  dim={!taxpayer?.gründungsjahr}
+                  tip={<ElsterTip lines={[
+                    t("dashboard.kst_1f_z40_note"),
+                    t("dashboard.kst_1f_z40_note_2"),
+                  ]} />}
+                />
+                <KRow
+                  label={t("dashboard.kst_1f_z41")}
+                  value={t("dashboard.kst_leer_lassen")}
+                  dim
+                  tip={<ElsterTip lines={[t("dashboard.kst_1f_z41_note")]} />}
+                />
+                <KRow
+                  label={t("dashboard.kst_1f_z42")}
+                  value={t("dashboard.kst_leer_lassen")}
+                  dim
+                  tip={<ElsterTip lines={[
+                    t("dashboard.kst_1f_z42_note"),
+                    t("dashboard.kst_1f_z42_note_2"),
+                  ]} />}
+                />
+                <KRow
+                  label={t("dashboard.kst_1f_z43")}
+                  value={t("dashboard.kst_leer_lassen")}
+                  dim
+                  tip={<ElsterTip lines={[t("dashboard.kst_1f_z43_note")]} />}
+                />
+                <KRow
+                  label={t("dashboard.kst_1f_zugaenge")}
+                  value={t("dashboard.kst_manual_zero")}
+                  dim
+                  tip={<ElsterTip lines={[t("dashboard.kst_1f_zugaenge_note")]} />}
+                />
+                <KRow label={t("dashboard.kst_1f_abgaenge")} value={t("dashboard.kst_manual_zero")} dim />
+                <tr className="border-t-2 border-amber-300">
+                  <td className="py-2 text-xs font-black text-black font-mono">{t("dashboard.kst_1f_endbestand")}</td>
+                  <td className="py-2 text-right text-xs font-black font-mono whitespace-nowrap pl-6 w-36 text-black">{fE(einlagekontoAnfang)}</td>
+                </tr>
+                {einlagekontoAnfang > 0 && (
+                  <tr><td colSpan={2} className="py-0.5 text-[9px] font-mono text-black/40">
+                    * {t("dashboard.kst_1f_s3_approx_note")}
+                  </td></tr>
+                )}
+                <KRow
+                  label={t("dashboard.kst_1f_sonderausweis")}
+                  value={t("dashboard.kst_manual_zero")}
+                  dim
+                  tip={<ElsterTip lines={[t("dashboard.kst_1f_sonderausweis_note")]} />}
+                />
+
+                {/* 6 — Bezüge § 7 UmwStG bei Abspaltung */}
+                <ZveSubHeader title={t("dashboard.kst_1f_s6_title")} />
+                <KRow label={t("dashboard.kst_1f_s6_row")} value="—" dim
+                  tip={<ElsterTip lines={[t("dashboard.kst_1f_s6_note")]} />}
+                />
+
+                {/* 7 — Bezüge § 7 UmwStG bei Verschmelzung etc. */}
+                <ZveSubHeader title={t("dashboard.kst_1f_s7_title")} />
+                <KRow label={t("dashboard.kst_1f_s7_row")} value="—" dim
+                  tip={<ElsterTip lines={[t("dashboard.kst_1f_s7_note")]} />}
+                />
+
+              </tbody>
+            </table>
+            <div className="bg-amber-50 border border-amber-300 rounded p-2 text-[11px] font-mono text-black/70">
+              {t("dashboard.kst_1f_open_note")}
+            </div>
           </div>
 
           <p className="text-[10px] text-black font-mono leading-relaxed">

@@ -246,7 +246,7 @@ export default function Dashboard({ receipts, allReceipts, period, taxpayer, onE
       <GewStPanel allReceipts={allReceipts} period={period} taxpayer={taxpayer} onEditTaxpayer={onEditTaxpayer} />
 
       {/* KÖRPERSCHAFTSTEUERERKLÄRUNG */}
-      <KStPanel allReceipts={allReceipts} period={period} />
+      <KStPanel allReceipts={allReceipts} period={period} taxpayer={taxpayer} onEditTaxpayer={onEditTaxpayer} />
 
       {/* Jahresabschluss */}
       <JahresabschlussPanel allReceipts={allReceipts} period={period} taxpayer={taxpayer} onEditTaxpayer={onEditTaxpayer} />
