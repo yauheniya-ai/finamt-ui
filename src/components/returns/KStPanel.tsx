@@ -22,6 +22,17 @@ function AnlageHeader({ title, law, href }: { title: string; law: string; href: 
   );
 }
 
+/** Lightweight sub-section divider row within a table (used inside Anlage ZVE) */
+function ZveSubHeader({ title }: { title: string }) {
+  return (
+    <tr>
+      <td colSpan={2} className="pt-3 pb-0.5 text-[9px] font-black uppercase tracking-widest text-black/40 font-mono border-b border-amber-200">
+        {title}
+      </td>
+    </tr>
+  );
+}
+
 /** A single computation row: label | value (right-aligned) */
 function KRow({
   label, value, bold, dim, indent, tip,
@@ -61,25 +72,31 @@ export function KStPanel({ allReceipts, period }: { allReceipts: Receipt[]; peri
     return s + net;
   }, 0);
 
-  // Anlage GK
-  const steuerbilanzgewinn = Math.round((revenueNet - expenseNet) * 100) / 100;
+  // Anlage GK — ELSTER: volle Geldbeträge (whole euros, § 60 Abs. 2 EStDV)
+  const steuerbilanzgewinn = Math.round(revenueNet - expenseNet); // full euros
   const hinzurechnungen    = 0; // manual — show as 0
-  const einkuenfteGK       = Math.round((steuerbilanzgewinn + hinzurechnungen) * 100) / 100;
+  const einkuenfteGK       = steuerbilanzgewinn + hinzurechnungen;
 
   // Anlage ZVE
   const gesamtbetrag  = einkuenfteGK;
   const verlustabzug  = 0; // manual
   const spendenabzug  = 0; // manual
-  const einkommen     = Math.round((gesamtbetrag - verlustabzug - spendenabzug) * 100) / 100;
+  const einkommen     = gesamtbetrag - verlustabzug - spendenabzug;
   const zve           = einkommen; // no Freibetrag for GmbH
 
-  // KSt 1 — Steuerberechnung
-  const koerperschaftsteuer = Math.round(Math.max(zve, 0) * 0.15 * 100) / 100; // § 23 KStG
-  const solidaritaet        = Math.round(koerperschaftsteuer * 0.055 * 100) / 100; // SolZG
-  const gesamtbelastung     = Math.round((koerperschaftsteuer + solidaritaet) * 100) / 100;
+  // KSt 1 — Steuerberechnung (also whole euros)
+  const koerperschaftsteuer = Math.round(Math.max(zve, 0) * 0.15); // § 23 KStG
+  const solidaritaet        = Math.round(koerperschaftsteuer * 0.055); // SolZG
+  const gesamtbelastung     = koerperschaftsteuer + solidaritaet;
 
+  // Anlage Verluste — triggered when Gesamtbetrag der Einkünfte is negative (§ 10d EStG)
+  const verlustJahr    = gesamtbetrag < 0 ? Math.abs(gesamtbetrag) : 0;
+  const anfangsbestand = 0; // prior-year Endbestand — manual entry in ELSTER
+  const endbestand     = anfangsbestand + verlustJahr;
+
+  // Formatter for ELSTER whole-euro fields (no decimal separator)
   const fE = (n: number) =>
-    n.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+    n.toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + " €";
   const negFmt = (n: number) => (n < 0 ? `−${fE(Math.abs(n))}` : fE(n));
 
   return (
@@ -107,65 +124,6 @@ export function KStPanel({ allReceipts, period }: { allReceipts: Receipt[]; peri
             {period.mode === "all" && (
               <span className="text-[10px] text-black font-mono">← {t("dashboard.jab_year_hint_all")}</span>
             )}
-          </div>
-
-          {/* ── Anlage GK ──────────────────────────────────────────────── */}
-          <div className="flex flex-col gap-2">
-            <AnlageHeader
-              title={t("dashboard.kst_anlage_gk_title")}
-              law="§ 7 KStG"
-              href="https://www.gesetze-im-internet.de/kstg_1977/__7.html"
-            />
-            <table className="w-full border-collapse">
-              <tbody>
-                <KRow
-                  label={t("dashboard.kst_steuerbilanzgewinn")}
-                  value={negFmt(steuerbilanzgewinn)}
-                  tip={<ElsterTip lines={[t("dashboard.kst_steuerbilanz_note")]} />}
-                />
-                <KRow
-                  label={t("dashboard.kst_hinzurechnungen")}
-                  value={t("dashboard.kst_manual_zero")}
-                  dim
-                  indent
-                />
-                <tr className="border-t-2 border-amber-300">
-                  <td className="py-2 text-xs font-black text-black font-mono">{t("dashboard.kst_einkuenfte_gk")}</td>
-                  <td className="py-2 text-right text-xs font-black font-mono whitespace-nowrap pl-6 w-36 text-black">
-                    {negFmt(einkuenfteGK)}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {/* ── Anlage ZVE ─────────────────────────────────────────────── */}
-          <div className="flex flex-col gap-2">
-            <AnlageHeader
-              title={t("dashboard.kst_anlage_zve_title")}
-              law="§ 8 KStG"
-              href="https://www.gesetze-im-internet.de/kstg_1977/__8.html"
-            />
-            <table className="w-full border-collapse">
-              <tbody>
-                <KRow label={t("dashboard.kst_gesamtbetrag")} value={negFmt(gesamtbetrag)} />
-                <KRow label={t("dashboard.kst_verlustabzug")}  value={t("dashboard.kst_manual_zero")} dim indent />
-                <KRow label={t("dashboard.kst_spendenabzug")}  value={t("dashboard.kst_manual_zero")} dim indent />
-                <tr className="border-t border-amber-200">
-                  <td className="py-1.5 text-xs font-bold text-black font-mono">{t("dashboard.kst_einkommen")}</td>
-                  <td className="py-1.5 text-right text-xs font-bold font-mono whitespace-nowrap pl-6 w-36 text-black">
-                    {negFmt(einkommen)}
-                  </td>
-                </tr>
-                <KRow label={t("dashboard.kst_freibetrag_na")} value="—" dim indent />
-                <tr className="border-t-2 border-amber-300">
-                  <td className="py-2 text-xs font-black text-black font-mono">{t("dashboard.kst_zve_label")}</td>
-                  <td className="py-2 text-right text-xs font-black font-mono whitespace-nowrap pl-6 w-36 text-black">
-                    {negFmt(zve)}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
           </div>
 
           {/* ── KSt 1 — Steuerberechnung ───────────────────────────────── */}
@@ -198,6 +156,148 @@ export function KStPanel({ allReceipts, period }: { allReceipts: Receipt[]; peri
               {t("dashboard.kst_no_liability")}
             </div>
           )}
+
+          {/* ── Anlage GK ──────────────────────────────────────────────── */}
+          <div className="flex flex-col gap-2">
+            <AnlageHeader
+              title={t("dashboard.kst_anlage_gk_title")}
+              law="§ 7 KStG"
+              href="https://www.gesetze-im-internet.de/kstg_1977/__7.html"
+            />
+            <table className="w-full border-collapse">
+              <tbody>
+                <KRow
+                  label={t("dashboard.kst_steuerbilanzgewinn")}
+                  value={negFmt(steuerbilanzgewinn)}
+                  tip={<ElsterTip lines={[
+                    t("dashboard.kst_steuerbilanz_note"),
+                    t("dashboard.kst_steuerbilanz_note_2"),
+                    t("dashboard.kst_steuerbilanz_note_3"),
+                    t("dashboard.kst_steuerbilanz_note_4"),
+                    t("dashboard.kst_steuerbilanz_note_5"),
+                  ]} />}
+                />
+                <KRow
+                  label={t("dashboard.kst_hinzurechnungen")}
+                  value={t("dashboard.kst_manual_zero")}
+                  dim
+                  indent
+                />
+                <tr className="border-t-2 border-amber-300">
+                  <td className="py-2 text-xs font-black text-black font-mono">{t("dashboard.kst_einkuenfte_gk")}</td>
+                  <td className="py-2 text-right text-xs font-black font-mono whitespace-nowrap pl-6 w-36 text-black">
+                    {negFmt(einkuenfteGK)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* ── Anlage Verluste (shown when loss year) ─────────────────── */}
+          {gesamtbetrag < 0 && (
+            <div className="flex flex-col gap-2">
+              <AnlageHeader
+                title={t("dashboard.kst_anlage_verluste_title")}
+                law="§ 10d EStG"
+                href="https://www.gesetze-im-internet.de/estg/__10d.html"
+              />
+              <p className="text-[10px] font-mono text-black/50 leading-relaxed">{t("dashboard.kst_anlage_verluste_subtitle")}</p>
+              <table className="w-full border-collapse">
+                <tbody>
+                  <KRow
+                    label={t("dashboard.kst_vlv_anfangsbestand")}
+                    value={t("dashboard.kst_manual_zero")}
+                    dim
+                    tip={<ElsterTip lines={[
+                      t("dashboard.kst_vlv_anfangsbestand_note"),
+                      t("dashboard.kst_vlv_anfangsbestand_note_2"),
+                    ]} />}
+                  />
+                  <KRow
+                    label={t("dashboard.kst_vlv_verlust_jahr")}
+                    value={fE(verlustJahr)}
+                    tip={<ElsterTip lines={[t("dashboard.kst_vlv_verlust_jahr_note")]} />}
+                  />
+                  <tr className="border-t-2 border-amber-300">
+                    <td className="py-2 text-xs font-black text-black font-mono">{t("dashboard.kst_vlv_endbestand")}</td>
+                    <td className="py-2 text-right text-xs font-black font-mono whitespace-nowrap pl-6 w-36 text-black">
+                      {fE(endbestand)}
+                    </td>
+                  </tr>
+                  <KRow label={t("dashboard.kst_vlv_para8d")}          value="—" dim />
+                  <KRow label={t("dashboard.kst_vlv_beitrittsgebiet")} value="—" dim />
+                </tbody>
+              </table>
+              <div className="bg-amber-50 border border-amber-300 rounded p-2 text-[11px] font-mono text-black/70">
+                {t("dashboard.kst_vlv_endbestand_note")}
+              </div>
+            </div>
+          )}
+
+          {/* ── Anlage ZVE ─────────────────────────────────────────────── */}
+          <div className="flex flex-col gap-2">
+            <AnlageHeader
+              title={t("dashboard.kst_anlage_zve_title")}
+              law="§ 8 KStG"
+              href="https://www.gesetze-im-internet.de/kstg_1977/__8.html"
+            />
+            <table className="w-full border-collapse">
+              <tbody>
+
+                {/* A: Ermittlung der Summe der Einkünfte (Z. 1–15) */}
+                <ZveSubHeader title={t("dashboard.kst_zve_summe_title")} />
+                <KRow label={t("dashboard.kst_zve_row1")}   value="—" dim />
+                <KRow
+                  label={t("dashboard.kst_zve_row2")}
+                  value={negFmt(einkuenfteGK)}
+                  tip={<ElsterTip lines={[
+                    t("dashboard.kst_zve_row2_note"),
+                    t("dashboard.kst_zve_row2_note_2"),
+                  ]} />}
+                />
+                <KRow label={t("dashboard.kst_zve_row3_7")}  value="—" dim />
+                <KRow label={t("dashboard.kst_zve_row8_14")} value="—" dim />
+                <tr className="border-t-2 border-amber-300">
+                  <td className="py-2 text-xs font-black text-black font-mono">{t("dashboard.kst_zve_row15")}</td>
+                  <td className="py-2 text-right text-xs font-black font-mono whitespace-nowrap pl-6 w-36 text-black">{negFmt(einkuenfteGK)}</td>
+                </tr>
+
+                {/* B: Ermittlung des Gesamtbetrags der Einkünfte (Z. 16–27) */}
+                <ZveSubHeader title={t("dashboard.kst_zve_gesamtbetrag_title")} />
+                <KRow label={t("dashboard.kst_zve_row16_26")} value="—" dim />
+                <tr className="border-t-2 border-amber-300">
+                  <td className="py-2 text-xs font-black text-black font-mono">{t("dashboard.kst_zve_row27")}</td>
+                  <td className="py-2 text-right text-xs font-black font-mono whitespace-nowrap pl-6 w-36 text-black">{negFmt(gesamtbetrag)}</td>
+                </tr>
+
+                {/* C: Ermittlung des ZVE (Z. 28–33) */}
+                <ZveSubHeader title={t("dashboard.kst_zve_einkommen_title")} />
+                <KRow
+                  label={t("dashboard.kst_zve_row28")}
+                  value={t("dashboard.kst_manual_zero")}
+                  dim
+                  tip={<ElsterTip lines={[
+                    t("dashboard.kst_zve_row28_note"),
+                    t("dashboard.kst_zve_row28_note_2"),
+                  ]} />}
+                />
+                <KRow label={t("dashboard.kst_zve_row29_31")} value="—" dim />
+                <tr className="border-t border-amber-200">
+                  <td className="py-1.5 text-xs font-bold text-black font-mono">{t("dashboard.kst_zve_row32")}</td>
+                  <td className="py-1.5 text-right text-xs font-bold font-mono whitespace-nowrap pl-6 w-36 text-black">{negFmt(einkommen)}</td>
+                </tr>
+                <tr className="border-t-2 border-amber-300">
+                  <td className="py-2 text-xs font-black text-black font-mono">{t("dashboard.kst_zve_row33")}</td>
+                  <td className="py-2 text-right text-xs font-black font-mono whitespace-nowrap pl-6 w-36 text-black">{negFmt(zve)}</td>
+                </tr>
+
+                {/* D: Weitere Angaben (Z. 34–36) */}
+                <ZveSubHeader title={t("dashboard.kst_zve_weitere_title")} />
+                <KRow label={t("dashboard.kst_zve_row34_36")} value="—" dim />
+
+              </tbody>
+            </table>
+          </div>
 
           <p className="text-[10px] text-black font-mono leading-relaxed">
             ℹ {t("dashboard.kst_disclaimer")}
