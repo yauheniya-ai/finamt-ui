@@ -233,6 +233,8 @@ export default function App() {
           period={period}
           taxpayer={taxpayer}
           onEditTaxpayer={() => setShowTaxpayerModal(true)}
+          apiBase={API_BASE}
+          dbPath={activeDb}
         />
         <PreviewPanel
           receipt={selected}

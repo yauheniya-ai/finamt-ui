@@ -148,11 +148,13 @@ function computeJab(
   };
 }
 
-export function JahresabschlussPanel({ allReceipts, period, taxpayer, onEditTaxpayer }: {
+export function JahresabschlussPanel({ allReceipts, period, taxpayer, onEditTaxpayer, apiBase = "", dbPath }: {
   allReceipts:     Receipt[];
   period:          PeriodFilter;
   taxpayer?:       TaxpayerProfile | null;
   onEditTaxpayer?: () => void;
+  apiBase?:        string;
+  dbPath?:         string | null;
 }) {
   const { t } = useTranslation();
   const currentYear = new Date().getFullYear();
@@ -164,6 +166,44 @@ export function JahresabschlussPanel({ allReceipts, period, taxpayer, onEditTaxp
   const [s, setS] = useState<JabSettings>({
     nettomethode: true,
   });
+  const [xbrlDownloading, setXbrlDownloading] = useState(false);
+  const [xbrlError, setXbrlError] = useState<string | null>(null);
+
+  async function downloadXbrl() {
+    setXbrlDownloading(true);
+    setXbrlError(null);
+    try {
+      const qs = dbPath ? `?db=${encodeURIComponent(dbPath)}` : "";
+      const res = await fetch(`${apiBase}/tax/ebilanz/xbrl${qs}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          year,
+          steuernummer: taxpayer?.tax_number ?? "",
+          company_name: taxpayer?.name ?? "",
+          legal_form:   taxpayer?.rechtsform ?? "GmbH",
+          stammkapital: stammkapital,
+          eingezahltes_kapital: eingezahlt,
+          vortrag: bilanz.gewinnvortrag,
+          nettomethode: s.nettomethode,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(err.detail ?? res.statusText);
+      }
+      const blob = await res.blob();
+      const filename = `ebilanz_${year}.xbrl`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = filename; a.click();
+      URL.revokeObjectURL(url);
+    } catch (e: unknown) {
+      setXbrlError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setXbrlDownloading(false);
+    }
+  }
 
   // Company facts come from taxpayer profile (persisted in DB).
   // Fall back to sensible defaults so the panel is always usable.
@@ -427,6 +467,89 @@ export function JahresabschlussPanel({ allReceipts, period, taxpayer, onEditTaxp
             <p className="text-[10px] text-black font-mono mt-3 leading-relaxed">
               ℹ {t("dashboard.jab_disclaimer")}
             </p>
+          </div>
+
+          {/* ── Filing Obligations ────────────────────────────────────── */}
+          <div className="flex flex-col gap-3">
+            <h4 className="text-xs font-black uppercase tracking-wider text-black">
+              {t("dashboard.jab_filing_section")}
+            </h4>
+            <p className="text-[10px] font-mono text-black/70">{t("dashboard.jab_filing_note")}</p>
+
+            {/* E-Bilanz */}
+            <div className="bg-blue-50 border border-blue-300 rounded p-3 flex flex-col gap-2">
+              <div className="flex items-baseline gap-2">
+                <span className="text-xs font-black text-blue-900">1 · {t("dashboard.jab_ebilanz_title")}</span>
+                <span className="text-[10px] font-mono text-blue-700">
+                  <LawLink law="§ 5b EStG" href="https://www.gesetze-im-internet.de/estg/__5b.html" />
+                </span>
+              </div>
+              <p className="text-[10px] font-mono text-blue-800/70 italic">{t("dashboard.jab_ebilanz_law")}</p>
+              <ol className="list-decimal list-inside flex flex-col gap-1">
+                {(["step1","step2"] as const).map((s, i) => (
+                  <li key={i} className="text-[10px] font-mono text-blue-900 leading-relaxed">
+                    {t(`dashboard.jab_ebilanz_${s}`)}
+                  </li>
+                ))}
+              </ol>
+
+              {/* Download XBRL button */}
+              <div className="flex flex-col gap-1 mt-1">
+                <button
+                  onClick={downloadXbrl}
+                  disabled={xbrlDownloading}
+                  className="self-start text-[10px] font-black px-3 py-1.5 rounded border-2 border-blue-700 bg-blue-700 text-white hover:bg-blue-900 hover:border-blue-900 disabled:opacity-50 transition-colors"
+                >
+                  {xbrlDownloading ? "…" : t("dashboard.jab_ebilanz_download")}
+                </button>
+                <p className="text-[10px] font-mono text-blue-700/70">{t("dashboard.jab_ebilanz_download_hint")}</p>
+                {xbrlError && (
+                  <p className="text-[10px] font-mono text-red-700 font-bold">✗ {xbrlError}</p>
+                )}
+              </div>
+
+              <div className="flex gap-4 mt-1">
+                <a href="https://www.elster.de" target="_blank" rel="noopener noreferrer"
+                  className="text-[10px] font-bold text-blue-700 underline underline-offset-2 hover:text-blue-900">
+                  → www.elster.de (Zertifikat)
+                </a>
+                <a href="https://www.elster.de/elsterweb/softwareprodukt/eric" target="_blank" rel="noopener noreferrer"
+                  className="text-[10px] font-bold text-blue-700 underline underline-offset-2 hover:text-blue-900">
+                  → ERiC herunterladen
+                </a>
+              </div>
+            </div>
+
+            {/* Bundesanzeiger */}
+            <div className="bg-amber-50 border border-amber-400 rounded p-3 flex flex-col gap-2">
+              <div className="flex items-baseline gap-2">
+                <span className="text-xs font-black text-amber-900">2 · {t("dashboard.jab_bundesanzeiger_title")}</span>
+                <span className="text-[10px] font-mono text-amber-700">
+                  <LawLink law="§ 325 HGB" href="https://www.gesetze-im-internet.de/hgb/__325.html" />
+                  {" + "}
+                  <LawLink law="§ 326 Abs. 2 HGB" href="https://www.gesetze-im-internet.de/hgb/__326.html" />
+                </span>
+              </div>
+              <p className="text-[10px] font-mono text-amber-800/70 italic">{t("dashboard.jab_bundesanzeiger_law")}</p>
+              <ol className="list-decimal list-inside flex flex-col gap-1">
+                {(["step1","step2","step3","step4"] as const).map((s, i) => (
+                  <li key={i} className="text-[10px] font-mono text-amber-900 leading-relaxed">
+                    {t(`dashboard.jab_bundesanzeiger_${s}`)}
+                  </li>
+                ))}
+                <li className="text-[10px] font-mono text-amber-900 leading-relaxed font-bold">
+                  {t("dashboard.jab_bundesanzeiger_step5", { year, deadline: year + 1 })}
+                </li>
+              </ol>
+              <a
+                href="https://www.bundesanzeiger.de"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[10px] font-bold text-amber-700 underline underline-offset-2 hover:text-amber-900 self-start"
+              >
+                → www.bundesanzeiger.de
+              </a>
+            </div>
           </div>
 
         </div>

@@ -11,7 +11,7 @@ import { GewStPanel } from "./returns/GewStPanel";
 import { KStPanel } from "./returns/KStPanel";
 import { JahresabschlussPanel } from "./returns/JahresabschlussPanel";
 
-type Props = { receipts: Receipt[]; allReceipts: Receipt[]; period: PeriodFilter; taxpayer?: TaxpayerProfile | null; onEditTaxpayer?: () => void };
+type Props = { receipts: Receipt[]; allReceipts: Receipt[]; period: PeriodFilter; taxpayer?: TaxpayerProfile | null; onEditTaxpayer?: () => void; apiBase?: string; dbPath?: string | null; };
 
 // ---------------------------------------------------------------------------
 // Stat card
@@ -124,7 +124,7 @@ function CategoryChart({ title, totals, receipts }: {
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
-export default function Dashboard({ receipts, allReceipts, period, taxpayer, onEditTaxpayer }: Props) {
+export default function Dashboard({ receipts, allReceipts, period, taxpayer, onEditTaxpayer, apiBase = "", dbPath }: Props) {
   const { t } = useTranslation();
 
   // ── Period label ────────────────────────────────────────────────────────
@@ -249,7 +249,7 @@ export default function Dashboard({ receipts, allReceipts, period, taxpayer, onE
       <KStPanel allReceipts={allReceipts} period={period} taxpayer={taxpayer} onEditTaxpayer={onEditTaxpayer} />
 
       {/* Jahresabschluss */}
-      <JahresabschlussPanel allReceipts={allReceipts} period={period} taxpayer={taxpayer} onEditTaxpayer={onEditTaxpayer} />
+      <JahresabschlussPanel allReceipts={allReceipts} period={period} taxpayer={taxpayer} onEditTaxpayer={onEditTaxpayer} apiBase={apiBase} dbPath={dbPath} />
 
       {/* Tax return tiles */}
       <div className="grid grid-cols-2 gap-3">
