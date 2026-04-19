@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
+import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
-import { IconChevronDown } from "../../constants/icons";
+import { IconChevronDown, IconFilePdf, IconPrint } from "../../constants/icons";
 import type { Receipt, PeriodFilter, TaxpayerProfile } from "../Sidebar";
 import { CASHFLOW_ONLY_CATS } from "../Sidebar";
 import { LawLink } from "./shared";
@@ -168,6 +169,11 @@ export function JahresabschlussPanel({ allReceipts, period, taxpayer, onEditTaxp
   });
   const [xbrlDownloading, setXbrlDownloading] = useState(false);
   const [xbrlError, setXbrlError] = useState<string | null>(null);
+  const [xbrlXml, setXbrlXml] = useState<string | null>(null);
+  const [xbrlPreviewOpen, setXbrlPreviewOpen] = useState(false);
+  const [bilanzPreviewOpen, setBilanzPreviewOpen] = useState(false);
+  const [bilanzHtml, setBilanzHtml] = useState<string | null>(null);
+  const bilanzIframeRef = useRef<HTMLIFrameElement>(null);
 
   async function downloadXbrl() {
     setXbrlDownloading(true);
@@ -205,6 +211,36 @@ export function JahresabschlussPanel({ allReceipts, period, taxpayer, onEditTaxp
     }
   }
 
+  async function previewXbrl() {
+    setXbrlError(null);
+    try {
+      const qs = dbPath ? `?db=${encodeURIComponent(dbPath)}` : "";
+      const res = await fetch(`${apiBase}/tax/ebilanz/xbrl${qs}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          year,
+          steuernummer: taxpayer?.tax_number ?? "",
+          company_name: taxpayer?.name ?? "",
+          legal_form:   taxpayer?.rechtsform ?? "GmbH",
+          stammkapital: stammkapital,
+          eingezahltes_kapital: eingezahlt,
+          vortrag: bilanz.gewinnvortrag,
+          nettomethode: s.nettomethode,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(err.detail ?? res.statusText);
+      }
+      const text = await res.text();
+      setXbrlXml(text);
+      setXbrlPreviewOpen(true);
+    } catch (e: unknown) {
+      setXbrlError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   // Company facts come from taxpayer profile (persisted in DB).
   // Fall back to sensible defaults so the panel is always usable.
   const gründungsjahr = Math.min(taxpayer?.gründungsjahr ?? year, year);
@@ -213,6 +249,99 @@ export function JahresabschlussPanel({ allReceipts, period, taxpayer, onEditTaxp
 
   const jab  = computeJab(allReceipts, gründungsjahr, stammkapital, eingezahlt, s.nettomethode, year);
   const { guv, bilanz } = jab;
+
+  function generateBilanzPdf() {
+    const eur = (n: number) =>
+      n.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+    const neg = (n: number) => n < 0 ? `- ${eur(Math.abs(n))}` : eur(n);
+    const row = (label: string, val: string, indent = 0, bold = false) => {
+      const pad = indent > 0 ? `padding-left:${indent * 12}pt` : "";
+      const w = bold ? "font-weight:bold" : "";
+      return `<tr><td style="${pad};${w}">${label}</td><td style="text-align:right;${w}">${val}</td></tr>`;
+    };
+    const totalRow = (label: string, val: string) =>
+      `<tr style="border-top:1.5pt solid black"><td style="font-weight:bold;padding-top:4pt">${label}</td><td style="text-align:right;font-weight:bold;padding-top:4pt">${val}</td></tr>`;
+
+    const company = taxpayer?.name ?? "–";
+    const b = bilanz;
+    const ausstehendeRow = !s.nettomethode && b.ausstehendeEinlagenAktiva > 0
+      ? row("C. Ausstehende Einlagen auf das gezeichnete Kapital", eur(b.ausstehendeEinlagenAktiva), 0, true) : "";
+    const nichtEingRow = s.nettomethode && b.nichtEingefordert > 0
+      ? row("./. Nicht eingeforderte ausstehende Einlagen", `- ${eur(b.nichtEingefordert)}`, 2) : "";
+    const gwRow = b.gewinnvortrag !== 0
+      ? row("IV. Gewinnvortrag / Verlustvortrag", neg(b.gewinnvortrag), 1) : "";
+    const stRow = b.steuerpositionen !== 0
+      ? row("B. Steuerpositionen / sonstige Passiva", neg(b.steuerpositionen)) : "";
+
+    const html = `<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="UTF-8"><title>Bilanz ${year} — ${company}</title>
+<style>
+@page{size:A4 portrait;margin:20mm 18mm}
+*{box-sizing:border-box;margin:0;padding:0}
+html{background:#fef3c7}
+body{font-family:'Courier New',monospace;font-size:9.5pt;color:#000;
+  background:#fff;max-width:174mm;min-height:257mm;margin:16pt auto;padding:20mm 18mm;
+  box-shadow:0 2px 16px rgba(0,0,0,.18)}
+.header{text-align:center;margin-bottom:18pt;border-bottom:1.5pt solid #000;padding-bottom:10pt}
+.header h1{font-size:13pt;font-weight:bold;margin-bottom:3pt}
+.header p{font-size:9.5pt}
+.subheader{font-size:8pt;color:#555;margin-top:4pt}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:28pt;margin-top:14pt}
+.col-header{font-size:8pt;font-weight:bold;text-transform:uppercase;letter-spacing:.06em;margin-bottom:7pt}
+table{width:100%;border-collapse:collapse}
+td{padding:2.2pt 0;border-bottom:.4pt solid #ddd;vertical-align:top}
+td:last-child{text-align:right;white-space:nowrap}
+.balance-check{margin-top:18pt;font-size:8pt;padding:6pt 8pt;border:1pt solid #000}
+.footnote{margin-top:22pt;font-size:7.5pt;color:#555}
+@media print{html{background:none}body{max-width:none;margin:0;padding:0;box-shadow:none}a{color:#000}}
+</style></head>
+<body>
+<div class="header">
+  <h1>Bilanz zum 31. Dezember ${year}</h1>
+  <p>${company}</p>
+  <p class="subheader">Kleinstkapitalgesellschaft · § 267a HGB · Aufgestellt gemäß §§ 242, 266 HGB</p>
+</div>
+<div class="two-col">
+  <div>
+    <div class="col-header">Aktiva</div>
+    <table><tbody>
+      ${row("A. Anlagevermögen", eur(0))}
+      ${row("B. Umlaufvermögen", "")}
+      ${row("III. Kassenbestand, Guthaben bei Kreditinstituten", eur(b.kassenbestand), 2, true)}
+      ${ausstehendeRow}
+      ${totalRow("Bilanzsumme Aktiva", eur(b.summeAktiva))}
+    </tbody></table>
+  </div>
+  <div>
+    <div class="col-header">Passiva</div>
+    <table><tbody>
+      ${row("A. Eigenkapital", "")}
+      ${row("I. Gezeichnetes Kapital", eur(b.stammkapital), 1)}
+      ${nichtEingRow}
+      ${row("III. Jahresergebnis", neg(b.jahresergebnis), 1)}
+      ${gwRow}
+      <tr><td></td><td style="text-align:right;border-top:.4pt solid #999">${neg(b.summeEigenkapital)}</td></tr>
+      ${stRow}
+      ${totalRow("Bilanzsumme Passiva", eur(b.summePassiva))}
+    </tbody></table>
+  </div>
+</div>
+<div class="balance-check">
+  Bilanzsumme Aktiva: <strong>${eur(b.summeAktiva)}</strong> &nbsp;| 
+  Bilanzsumme Passiva: <strong>${eur(b.summePassiva)}</strong> &nbsp;| 
+  ${b.ausgeglichen ? "✓ ausgeglichen" : `✗ Differenz: ${eur(Math.abs(b.differenz))}`}
+</div>
+<div class="footnote">
+  Erstellt mit <a href="https://pypi.org/project/finamt/" target="_blank"><strong>finamt</strong></a> · ${new Date().toLocaleDateString("de-DE")} ·
+  Einreichung beim Bundesanzeiger gemäß § 325 Abs. 1 HGB i.V.m. § 326 Abs. 2 HGB.
+  Als Kleinstkapitalgesellschaft sind GuV und Anhang von der Offenlegungspflicht befreit.
+</div>
+</body></html>`;
+
+    setBilanzHtml(html);
+    setBilanzPreviewOpen(true);
+  }
 
   const fE = (n: number) =>
     n.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
@@ -477,45 +606,54 @@ export function JahresabschlussPanel({ allReceipts, period, taxpayer, onEditTaxp
             <p className="text-[10px] font-mono text-black/70">{t("dashboard.jab_filing_note")}</p>
 
             {/* E-Bilanz */}
-            <div className="bg-blue-50 border border-blue-300 rounded p-3 flex flex-col gap-2">
+            <div className="bg-amber-50 border border-amber-400 rounded p-3 flex flex-col gap-2">
               <div className="flex items-baseline gap-2">
-                <span className="text-xs font-black text-blue-900">1 · {t("dashboard.jab_ebilanz_title")}</span>
-                <span className="text-[10px] font-mono text-blue-700">
+                <span className="text-xs font-black text-black">1 · {t("dashboard.jab_ebilanz_title")}</span>
+                <span className="text-[10px] font-mono text-black/60">
                   <LawLink law="§ 5b EStG" href="https://www.gesetze-im-internet.de/estg/__5b.html" />
                 </span>
               </div>
-              <p className="text-[10px] font-mono text-blue-800/70 italic">{t("dashboard.jab_ebilanz_law")}</p>
-              <ol className="list-decimal list-inside flex flex-col gap-1">
-                {(["step1","step2"] as const).map((s, i) => (
-                  <li key={i} className="text-[10px] font-mono text-blue-900 leading-relaxed">
-                    {t(`dashboard.jab_ebilanz_${s}`)}
-                  </li>
-                ))}
-              </ol>
+              <p className="text-[10px] font-mono text-black/60 italic">{t("dashboard.jab_ebilanz_law")}</p>
 
-              {/* Download XBRL button */}
-              <div className="flex flex-col gap-1 mt-1">
-                <button
-                  onClick={downloadXbrl}
-                  disabled={xbrlDownloading}
-                  className="self-start text-[10px] font-black px-3 py-1.5 rounded border-2 border-blue-700 bg-blue-700 text-white hover:bg-blue-900 hover:border-blue-900 disabled:opacity-50 transition-colors"
-                >
-                  {xbrlDownloading ? "…" : t("dashboard.jab_ebilanz_download")}
-                </button>
-                <p className="text-[10px] font-mono text-blue-700/70">{t("dashboard.jab_ebilanz_download_hint")}</p>
+              {/* Step 1 */}
+              <p className="text-[10px] font-mono text-black leading-relaxed">
+                {t("dashboard.jab_ebilanz_step1")}
+              </p>
+
+              {/* Download + Preview XBRL buttons — after step 1, before step 2 */}
+              <div className="flex flex-col gap-1">
+                <div className="flex gap-2">
+                  <button
+                    onClick={downloadXbrl}
+                    disabled={xbrlDownloading}
+                    className="text-[10px] font-black px-3 py-1.5 rounded border-2 border-black bg-black text-white hover:text-amber-400 disabled:opacity-50 transition-colors"
+                  >
+                    {xbrlDownloading
+                      ? "…"
+                      : <span className="flex items-center gap-1.5"><Icon icon="mdi:download" className="w-3.5 h-3.5" />{t("dashboard.jab_ebilanz_download")}</span>}
+                  </button>
+                  <button
+                    onClick={previewXbrl}
+                    className="text-[10px] font-black px-3 py-1.5 rounded border-2 border-black bg-white text-black hover:bg-amber-400 transition-colors"
+                  >
+                    <span className="flex items-center gap-1.5"><Icon icon="mdi:eye-outline" className="w-3.5 h-3.5" />{t("dashboard.jab_ebilanz_preview")}</span>
+                  </button>
+                </div>
+                <p className="text-[10px] font-mono text-black/60">{t("dashboard.jab_ebilanz_download_hint")}</p>
                 {xbrlError && (
                   <p className="text-[10px] font-mono text-red-700 font-bold">✗ {xbrlError}</p>
                 )}
               </div>
 
+              {/* Step 2 */}
+              <p className="text-[10px] font-mono text-black leading-relaxed">
+                {t("dashboard.jab_ebilanz_step2")}
+              </p>
+
               <div className="flex gap-4 mt-1">
-                <a href="https://www.elster.de" target="_blank" rel="noopener noreferrer"
-                  className="text-[10px] font-bold text-blue-700 underline underline-offset-2 hover:text-blue-900">
-                  → www.elster.de (Zertifikat)
-                </a>
-                <a href="https://www.elster.de/elsterweb/softwareprodukt/eric" target="_blank" rel="noopener noreferrer"
-                  className="text-[10px] font-bold text-blue-700 underline underline-offset-2 hover:text-blue-900">
-                  → ERiC herunterladen
+                <a href="https://www.esteuer.de/#finanzantrag" target="_blank" rel="noopener noreferrer"
+                  className="text-[10px] font-bold text-black underline underline-offset-2 hover:text-amber-800">
+                  → HGB-Taxonomie herunterladen
                 </a>
               </div>
             </div>
@@ -523,21 +661,42 @@ export function JahresabschlussPanel({ allReceipts, period, taxpayer, onEditTaxp
             {/* Bundesanzeiger */}
             <div className="bg-amber-50 border border-amber-400 rounded p-3 flex flex-col gap-2">
               <div className="flex items-baseline gap-2">
-                <span className="text-xs font-black text-amber-900">2 · {t("dashboard.jab_bundesanzeiger_title")}</span>
-                <span className="text-[10px] font-mono text-amber-700">
+                <span className="text-xs font-black text-black">2 · {t("dashboard.jab_bundesanzeiger_title")}</span>
+                <span className="text-[10px] font-mono text-black/60">
                   <LawLink law="§ 325 HGB" href="https://www.gesetze-im-internet.de/hgb/__325.html" />
                   {" + "}
                   <LawLink law="§ 326 Abs. 2 HGB" href="https://www.gesetze-im-internet.de/hgb/__326.html" />
                 </span>
               </div>
-              <p className="text-[10px] font-mono text-amber-800/70 italic">{t("dashboard.jab_bundesanzeiger_law")}</p>
+              <p className="text-[10px] font-mono text-black/60 italic">{t("dashboard.jab_bundesanzeiger_law")}</p>
               <ol className="list-decimal list-inside flex flex-col gap-1">
-                {(["step1","step2","step3","step4"] as const).map((s, i) => (
-                  <li key={i} className="text-[10px] font-mono text-amber-900 leading-relaxed">
-                    {t(`dashboard.jab_bundesanzeiger_${s}`)}
-                  </li>
-                ))}
-                <li className="text-[10px] font-mono text-amber-900 leading-relaxed font-bold">
+                <li className="text-[10px] font-mono text-black leading-relaxed">
+                  {t("dashboard.jab_bundesanzeiger_step1")}
+                </li>
+                <li className="text-[10px] font-mono text-black leading-relaxed">
+                  {t("dashboard.jab_bundesanzeiger_step2")}
+                </li>
+                <li className="text-[10px] font-mono text-black leading-relaxed">
+                  {t("dashboard.jab_bundesanzeiger_step3")}
+                </li>
+                <li className="text-[10px] font-mono text-black leading-relaxed">
+                  {t("dashboard.jab_bundesanzeiger_step4")}
+                </li>
+              </ol>
+
+              {/* PDF button — sits after "Als PDF hochladen" step */}
+              <div className="flex flex-col gap-1">
+                <button
+                  onClick={generateBilanzPdf}
+                  className="self-start text-[10px] font-black px-3 py-1.5 rounded border-2 border-black bg-black text-white hover:text-amber-400 transition-colors"
+                >
+                  <span className="flex items-center gap-1.5"><Icon icon="fa7-solid:file-pdf" className="w-3.5 h-3.5" />{t("dashboard.jab_bundesanzeiger_pdf")}</span>
+                </button>
+                <p className="text-[10px] font-mono text-black/60">{t("dashboard.jab_bundesanzeiger_pdf_hint")}</p>
+              </div>
+
+              <ol className="list-decimal list-inside flex flex-col gap-1" start={5}>
+                <li className="text-[10px] font-mono text-black leading-relaxed font-bold">
                   {t("dashboard.jab_bundesanzeiger_step5", { year, deadline: year + 1 })}
                 </li>
               </ol>
@@ -545,13 +704,92 @@ export function JahresabschlussPanel({ allReceipts, period, taxpayer, onEditTaxp
                 href="https://www.bundesanzeiger.de"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-[10px] font-bold text-amber-700 underline underline-offset-2 hover:text-amber-900 self-start"
+                className="text-[10px] font-bold text-black underline underline-offset-2 hover:text-amber-800 self-start"
               >
                 → www.bundesanzeiger.de
               </a>
             </div>
           </div>
 
+        </div>
+      )}
+
+      {/* ── Bilanz Preview Modal ─────────────────────────────────────── */}
+      {bilanzPreviewOpen && bilanzHtml && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+          onClick={() => setBilanzPreviewOpen(false)}
+        >
+          <div
+            className="relative bg-white border-2 border-black rounded flex flex-col"
+            style={{ width: "calc(210mm + 4px)", height: "88vh", maxWidth: "98vw" }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-2 border-b-2 border-black bg-amber-50 shrink-0">
+              <span className="text-xs font-black uppercase tracking-wider">
+                Bilanz · {year} · {taxpayer?.name ?? "–"}
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => bilanzIframeRef.current?.contentWindow?.print()}
+                  className="text-[10px] font-black px-2 py-1 rounded border border-black bg-black text-white hover:text-amber-400 transition-colors"
+                >
+                  <span className="flex items-center gap-1">
+                    <IconPrint className="w-3.5 h-3.5" />
+                    <span>{t("dashboard.jab_bilanz_print")}</span>
+                    <span className="opacity-50 mx-0.5">/</span>
+                    <IconFilePdf className="w-3 h-3" />
+                    <span>{t("dashboard.jab_bilanz_save")}</span>
+                  </span>
+                </button>
+                <button
+                  onClick={() => setBilanzPreviewOpen(false)}
+                  className="text-[10px] font-black px-2 py-1 rounded border border-black hover:bg-black hover:text-white transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+            {/* A4 iframe body */}
+            <iframe
+              ref={bilanzIframeRef}
+              srcDoc={bilanzHtml}
+              title={`Bilanz ${year}`}
+              className="flex-1 w-full border-0"
+              style={{ background: "#fef3c7" }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ── XBRL Preview Modal ──────────────────────────────────────── */}
+      {xbrlPreviewOpen && xbrlXml && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+          onClick={() => setXbrlPreviewOpen(false)}
+        >
+          <div
+            className="relative bg-white border-2 border-black rounded w-[90vw] max-w-4xl h-[80vh] flex flex-col"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-2 border-b-2 border-black bg-amber-50">
+              <span className="text-xs font-black uppercase tracking-wider">
+                E-Bilanz XBRL · {year}
+              </span>
+              <button
+                onClick={() => setXbrlPreviewOpen(false)}
+                className="text-[10px] font-black px-2 py-1 rounded border border-black hover:bg-black hover:text-white transition-colors"
+              >
+                ✕ schließen
+              </button>
+            </div>
+            {/* Body */}
+            <pre className="flex-1 overflow-auto p-4 text-[10px] font-mono text-black leading-relaxed whitespace-pre">
+              {xbrlXml}
+            </pre>
+          </div>
         </div>
       )}
     </div>
