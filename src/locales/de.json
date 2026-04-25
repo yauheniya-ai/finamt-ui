@@ -669,6 +669,14 @@
     ],
     "jab_ebilanz_eric_saved": "Gespeichert",
     "jab_ebilanz_eric_edit": "Bearbeiten",
+    "jab_ebilanz_hersteller_id": "Hersteller-ID",
+    "jab_ebilanz_hersteller_why": [
+      "Die Hersteller-ID weist Ihre Software bei ELSTER als autorisierte Übermittlungssoftware aus.",
+      "Sie erhalten sie nach Registrierung als Softwarehersteller auf dem ELSTER-Entwicklerportal:",
+      "www.elster.de/eportal/softwareentwickler",
+      "Nach dem Ausfüllen eines Antragsformulars wird die ID per E-Mail zugeschickt.",
+      "Ohne gültige Hersteller-ID lehnt ERiC die Übermittlung ab."
+    ],
     "jab_ebilanz_cert_path": "Zertifikat (.pfx)",
     "jab_ebilanz_cert_why": [
       "Authentifizierungszertifikat für ELSTER (PKCS#12, .pfx oder .p12).",

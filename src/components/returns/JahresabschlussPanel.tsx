@@ -187,7 +187,7 @@ export function JahresabschlussPanel({ allReceipts, period, taxpayer, onEditTaxp
   const [certPassword, setCertPassword]     = useState("");
   const [certPinSaved, setCertPinSaved]     = useState(false);
   const [elsterId, setElsterId]             = useState("");
-  const [elsterIdSaved, setElsterIdSaved]   = useState(false);
+  const [herstellerId, setHerstellerId]     = useState("");
   const [showPin, setShowPin]               = useState(false);
   const [useTest, setUseTest]               = useState(true);
   const [submitting, setSubmitting]         = useState(false);
@@ -206,15 +206,16 @@ export function JahresabschlussPanel({ allReceipts, period, taxpayer, onEditTaxp
     setCertPassword("");
     setCertPinSaved(false);
     setElsterId("");
-    setElsterIdSaved(false);
+    setHerstellerId("");
     const qs = dbPath ? `?db=${encodeURIComponent(dbPath)}` : "";
     fetch(`${apiBase}/tax/ebilanz/settings${qs}`)
       .then(r => r.ok ? r.json() : null)
       .then(d => {
         if (!d) return;
-        if (d.eric_home) { setEricHome(d.eric_home); setEricHomeSaved(true); }
-        if (d.elster_id) { setElsterId(d.elster_id); setElsterIdSaved(true); }
-        if (d.cert_pin)  { setCertPassword(d.cert_pin); setCertPinSaved(true); }
+        if (d.eric_home)     { setEricHome(d.eric_home); setEricHomeSaved(true); }
+        if (d.elster_id)     { setElsterId(d.elster_id); }
+        if (d.hersteller_id) { setHerstellerId(d.hersteller_id); }
+        if (d.cert_pin)      { setCertPassword(d.cert_pin); setCertPinSaved(true); }
       })
       .catch(() => {});
     fetch(`${apiBase}/tax/ebilanz/cert${qs}`)
@@ -328,7 +329,7 @@ export function JahresabschlussPanel({ allReceipts, period, taxpayer, onEditTaxp
         body: JSON.stringify({ cert_data_b64: b64 }),
       });
       if (res.ok) {
-        const d = await res.json();
+        await res.json();
         setCertSaved(true);
       }
     } catch { /* ignore — user can retry */ }
@@ -366,6 +367,7 @@ export function JahresabschlussPanel({ allReceipts, period, taxpayer, onEditTaxp
           vortrag:              bilanz.gewinnvortrag,
           nettomethode:         s.nettomethode,
           eric_home:            ericHome || undefined,
+          hersteller_id:        herstellerId || undefined,
           cert_data_b64:        certDataB64,
           cert_password:        certPassword || undefined,
           use_test:             useTest,
@@ -857,6 +859,22 @@ td:last-child{text-align:right;white-space:nowrap}
                   />
                 </div>
 
+                {/* ① b Hersteller-ID */}
+                <div className="flex flex-col gap-0.5">
+                  <div className="flex items-center gap-0">
+                    <label className="text-[9px] font-mono text-black/60">{t("dashboard.jab_ebilanz_hersteller_id")}</label>
+                    <ElsterTip lines={t("dashboard.jab_ebilanz_hersteller_why", { returnObjects: true }) as string[]} />
+                  </div>
+                  <input
+                    type="text"
+                    value={herstellerId}
+                    onChange={e => { setHerstellerId(e.target.value); }}
+                    onBlur={e => { const v = e.target.value.trim(); if (v) saveSetting("hersteller_id", v); }}
+                    placeholder="z. B. 12345"
+                    className="min-w-0 text-[10px] font-mono border border-black/20 rounded px-1.5 py-0.5 bg-white focus:outline-none focus:border-black placeholder:text-black/20"
+                  />
+                </div>
+
                 {/* ② Cert (.pfx) | ③ PIN — second row */}
                 <div className="grid grid-cols-2 gap-x-3 items-end">
 
@@ -1121,7 +1139,7 @@ td:last-child{text-align:right;white-space:nowrap}
                   onClick={() => setXbrlPreviewOpen(false)}
                   className="text-[10px] font-black px-2 py-1 rounded border border-black hover:bg-black hover:text-white transition-colors"
                 >
-                  ✕ schließen
+                  ✕ Schließen
                 </button>
               </div>
             </div>

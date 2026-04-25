@@ -670,6 +670,14 @@
     ],
     "jab_ebilanz_eric_saved": "Saved",
     "jab_ebilanz_eric_edit": "Edit",
+    "jab_ebilanz_hersteller_id": "Hersteller-ID (software publisher ID)",
+    "jab_ebilanz_hersteller_why": [
+      "The Hersteller-ID identifies your software as an authorised ELSTER submission client.",
+      "You receive it after registering as a software publisher on the ELSTER developer portal:",
+      "www.elster.de/eportal/softwareentwickler",
+      "Fill in the registration form and the ID will be sent to you by e-mail.",
+      "ERiC will reject the submission if the ID is missing or invalid."
+    ],
     "jab_ebilanz_cert_path": "Certificate (.pfx)",
     "jab_ebilanz_cert_why": [
       "ELSTER authentication certificate (PKCS#12, .pfx or .p12).",
