@@ -190,6 +190,7 @@ export default function App() {
     setActiveDb(db?.path ?? null);
     setSelected(null);
     setReceipts([]);
+    setPeriod(DEFAULT_PERIOD);
   };
 
   return (

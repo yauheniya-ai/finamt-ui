@@ -188,7 +188,7 @@ export default function Dashboard({ receipts, allReceipts, period, taxpayer, onE
               {onEditTaxpayer && (
                 <button
                   onClick={onEditTaxpayer}
-                  className="text-[10px] text-black hover:text-amber-700 font-bold underline underline-offset-2 shrink-0"
+                  className="cursor-pointer text-[10px] text-black hover:text-amber-700 font-bold underline underline-offset-2 shrink-0"
                 >
                   {t("sidebar.taxpayer_edit_btn")}
                 </button>

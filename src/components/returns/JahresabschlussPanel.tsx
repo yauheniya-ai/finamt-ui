@@ -1,10 +1,10 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import { IconChevronDown, IconFilePdf, IconPrint } from "../../constants/icons";
 import type { Receipt, PeriodFilter, TaxpayerProfile } from "../Sidebar";
 import { CASHFLOW_ONLY_CATS } from "../Sidebar";
-import { LawLink } from "./shared";
+import { LawLink, ElsterTip } from "./shared";
 
 // ---------------------------------------------------------------------------
 // Jahresabschluss (Bilanz + GuV) — § 267a HGB Kleinstkapitalgesellschaft
@@ -171,9 +171,82 @@ export function JahresabschlussPanel({ allReceipts, period, taxpayer, onEditTaxp
   const [xbrlError, setXbrlError] = useState<string | null>(null);
   const [xbrlXml, setXbrlXml] = useState<string | null>(null);
   const [xbrlPreviewOpen, setXbrlPreviewOpen] = useState(false);
+  const [xbrlCopied, setXbrlCopied] = useState(false);
+
   const [bilanzPreviewOpen, setBilanzPreviewOpen] = useState(false);
   const [bilanzHtml, setBilanzHtml] = useState<string | null>(null);
   const bilanzIframeRef = useRef<HTMLIFrameElement>(null);
+  // ERiC submit form
+  const [ericHome, setEricHome]             = useState("");
+  const [ericHomeSaved, setEricHomeSaved]   = useState(false);
+  const [certFile, setCertFile]             = useState<File | null>(null);
+  const certFileRef                         = useRef<HTMLInputElement>(null);
+  const ericHomeInputRef                    = useRef<HTMLInputElement>(null);
+  const [certSaved, setCertSaved]           = useState(false);
+  const [certUploading, setCertUploading]   = useState(false);
+  const [certPassword, setCertPassword]     = useState("");
+  const [certPinSaved, setCertPinSaved]     = useState(false);
+  const [elsterId, setElsterId]             = useState("");
+  const [elsterIdSaved, setElsterIdSaved]   = useState(false);
+  const [showPin, setShowPin]               = useState(false);
+  const [useTest, setUseTest]               = useState(true);
+  const [submitting, setSubmitting]         = useState(false);
+  const [validating, setValidating]         = useState(false);
+  const [submitError, setSubmitError]       = useState<string | null>(null);
+  const [validateMsg, setValidateMsg]       = useState<string | null>(null);
+  const [transferticket, setTransferticket] = useState<string | null>(null);
+
+  // Load stored ERiC home and cert on mount / project change
+  useEffect(() => {
+    // Clear immediately so previous project's values don't persist
+    setEricHome("");
+    setEricHomeSaved(false);
+    setCertSaved(false);
+    setCertFile(null);
+    setCertPassword("");
+    setCertPinSaved(false);
+    setElsterId("");
+    setElsterIdSaved(false);
+    const qs = dbPath ? `?db=${encodeURIComponent(dbPath)}` : "";
+    fetch(`${apiBase}/tax/ebilanz/settings${qs}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (!d) return;
+        if (d.eric_home) { setEricHome(d.eric_home); setEricHomeSaved(true); }
+        if (d.elster_id) { setElsterId(d.elster_id); setElsterIdSaved(true); }
+        if (d.cert_pin)  { setCertPassword(d.cert_pin); setCertPinSaved(true); }
+      })
+      .catch(() => {});
+    fetch(`${apiBase}/tax/ebilanz/cert${qs}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) { setCertSaved(d.stored); } })
+      .catch(() => {});
+  }, [apiBase, dbPath]);
+
+  async function saveSetting(key: string, value: string) {
+    const qs = dbPath ? `?db=${encodeURIComponent(dbPath)}` : "";
+    try {
+      await fetch(`${apiBase}/tax/ebilanz/settings${qs}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [key]: value }),
+      });
+    } catch { /* ignore */ }
+  }
+
+  async function saveEricHome(path: string) {
+    const trimmed = path.trim();
+    if (!trimmed) return;
+    const qs = dbPath ? `?db=${encodeURIComponent(dbPath)}` : "";
+    try {
+      const res = await fetch(`${apiBase}/tax/ebilanz/eric-home${qs}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eric_home: trimmed }),
+      });
+      if (res.ok) setEricHomeSaved(true);
+    } catch { /* ignore */ }
+  }
 
   async function downloadXbrl() {
     setXbrlDownloading(true);
@@ -238,6 +311,78 @@ export function JahresabschlussPanel({ allReceipts, period, taxpayer, onEditTaxp
       setXbrlPreviewOpen(true);
     } catch (e: unknown) {
       setXbrlError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function uploadCert(file: File) {
+    setCertUploading(true);
+    try {
+      const ab  = await file.arrayBuffer();
+      const u8  = new Uint8Array(ab);
+      const bin = Array.from(u8).map(b => String.fromCharCode(b)).join("");
+      const b64 = btoa(bin);
+      const qs  = dbPath ? `?db=${encodeURIComponent(dbPath)}` : "";
+      const res = await fetch(`${apiBase}/tax/ebilanz/cert${qs}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cert_data_b64: b64 }),
+      });
+      if (res.ok) {
+        const d = await res.json();
+        setCertSaved(true);
+      }
+    } catch { /* ignore — user can retry */ }
+    finally { setCertUploading(false); }
+  }
+
+  async function callEricEndpoint(validateOnly: boolean) {
+    const isSend = !validateOnly;
+    if (isSend) { setSubmitting(true); setTransferticket(null); }
+    else        { setValidating(true);  setValidateMsg(null); }
+    setSubmitError(null);
+
+    let certDataB64: string | undefined;
+    if (certFile) {
+      const ab  = await certFile.arrayBuffer();
+      const u8  = new Uint8Array(ab);
+      const bin = Array.from(u8).map(b => String.fromCharCode(b)).join("");
+      certDataB64 = btoa(bin);
+    }
+    // If no new file but a cert is stored server-side, backend will use it automatically
+
+    try {
+      const qs = dbPath ? `?db=${encodeURIComponent(dbPath)}` : "";
+      const res = await fetch(`${apiBase}/tax/ebilanz/submit${qs}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          year,
+          steuernummer:         taxpayer?.tax_number ?? "",
+          elster_id:            elsterId || undefined,
+          company_name:         taxpayer?.name ?? "",
+          legal_form:           taxpayer?.rechtsform ?? "GmbH",
+          stammkapital,
+          eingezahltes_kapital: eingezahlt,
+          vortrag:              bilanz.gewinnvortrag,
+          nettomethode:         s.nettomethode,
+          eric_home:            ericHome || undefined,
+          cert_data_b64:        certDataB64,
+          cert_password:        certPassword || undefined,
+          use_test:             useTest,
+          validate_only:        validateOnly,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error_message ?? data.detail ?? res.statusText);
+      }
+      if (isSend) setTransferticket(data.telenummer ?? "✓ OK");
+      else        setValidateMsg("✓ OK — XBRL valid");
+    } catch (e: unknown) {
+      setSubmitError(e instanceof Error ? e.message : String(e));
+    } finally {
+      if (isSend) setSubmitting(false);
+      else        setValidating(false);
     }
   }
 
@@ -478,8 +623,8 @@ td:last-child{text-align:right;white-space:nowrap}
                   <td className="py-1 text-right text-black">{fE(guv.sonstigeBetriebsausgaben)}</td>
                 </tr>
                 <tr className="border-t-2 border-amber-300">
-                  <td className="py-2 pl-2 font-black text-black text-sm">= {t("dashboard.jab_jahresergebnis")}</td>
-                  <td className="py-2 text-right font-black text-sm text-black">
+                  <td className="py-2 pl-2 font-black text-black">= {t("dashboard.jab_jahresergebnis")}</td>
+                  <td className="py-2 text-right font-black text-black">
                     {negFmt(guv.jahresergebnis)}
                   </td>
                 </tr>
@@ -606,11 +751,20 @@ td:last-child{text-align:right;white-space:nowrap}
 
             {/* E-Bilanz */}
             <div className="bg-amber-50 border border-amber-400 rounded p-3 flex flex-col gap-2">
-              <div className="flex items-baseline gap-2">
+              <div className="flex items-baseline gap-2 flex-wrap">
                 <span className="text-xs font-black text-black">1 · {t("dashboard.jab_ebilanz_title")}</span>
                 <span className="text-[10px] font-mono text-black/60">
                   <LawLink law="§ 5b EStG" href="https://www.gesetze-im-internet.de/estg/__5b.html" />
                 </span>
+                <a
+                  href="https://www.esteuer.de/#finanzantrag"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="HGB-Taxonomie"
+                  className="text-black/40 hover:text-amber-800 transition-colors leading-none"
+                >
+                  <Icon icon="mdi:information-outline" className="w-3.5 h-3.5" />
+                </a>
               </div>
               <p className="text-[10px] font-mono text-black/60 italic">{t("dashboard.jab_ebilanz_law")}</p>
 
@@ -649,11 +803,186 @@ td:last-child{text-align:right;white-space:nowrap}
                 {t("dashboard.jab_ebilanz_step2")}
               </p>
 
-              <div className="flex gap-4 mt-1">
-                <a href="https://www.esteuer.de/#finanzantrag" target="_blank" rel="noopener noreferrer"
-                  className="text-[10px] font-bold text-black underline underline-offset-2 hover:text-amber-800">
-                  → HGB-Taxonomie herunterladen
-                </a>
+              {/* ERiC submit form */}
+              <div className="flex flex-col gap-1.5 mt-1">
+
+                {/* Steuernummer — read-only from taxpayer profile */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[9px] font-mono text-black/60 shrink-0">{t("dashboard.jab_ebilanz_steuernummer")}:</span>
+                  <span className="text-[10px] font-mono font-bold text-black">
+                    {taxpayer?.tax_number || <span className="text-black/30 italic">–</span>}
+                  </span>
+                  {onEditTaxpayer && (
+                    <button
+                      onClick={onEditTaxpayer}
+                      className="text-[9px] font-black px-1.5 py-0.5 rounded border border-black/30 hover:border-black hover:bg-amber-100 transition-colors"
+                    >
+                      <span className="flex items-center gap-0.5">
+                        <Icon icon="mdi:pencil-outline" className="w-3 h-3" />
+                        {t("dashboard.jab_ebilanz_edit_taxpayer")}
+                      </span>
+                    </button>
+                  )}
+                </div>
+
+                {/* ① ERiC library path — full-width row */}
+                <div className="flex flex-col gap-0.5">
+                  <div className="flex items-center gap-0">
+                    <label className="text-[9px] font-mono text-black/60">{t("dashboard.jab_ebilanz_eric_home")}</label>
+                    {ericHomeSaved && (
+                      <>
+                        <span className="ml-1 text-[8px] font-mono text-green-700 flex items-center gap-0.5">
+                          <Icon icon="mdi:check-circle" className="w-2.5 h-2.5" />
+                          {t("dashboard.jab_ebilanz_eric_saved")}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => { setEricHomeSaved(false); setTimeout(() => ericHomeInputRef.current?.focus(), 0); }}
+                          className="ml-1 text-[8px] font-mono text-black/40 underline underline-offset-2 hover:text-black transition-colors"
+                        >
+                          {t("dashboard.jab_ebilanz_eric_edit")}
+                        </button>
+                      </>
+                    )}
+                    <ElsterTip lines={t("dashboard.jab_ebilanz_eric_why", { returnObjects: true }) as string[]} />
+                  </div>
+                  <input
+                    ref={ericHomeInputRef}
+                    type="text"
+                    value={ericHome}
+                    onChange={e => { setEricHome(e.target.value); setEricHomeSaved(false); }}
+                    onBlur={e => saveEricHome(e.target.value)}
+                    placeholder="/path/to/ERiC-.../lib"
+                    className="min-w-0 text-[10px] font-mono border border-black/20 rounded px-1.5 py-0.5 bg-white focus:outline-none focus:border-black placeholder:text-black/20"
+                  />
+                </div>
+
+                {/* ② Cert (.pfx) | ③ PIN — second row */}
+                <div className="grid grid-cols-2 gap-x-3 items-end">
+
+                  {/* ② Certificate .pfx */}
+                  <div className="flex flex-col gap-0.5">
+                    <div className="flex items-center gap-0">
+                      <label className="text-[9px] font-mono text-black/60">{t("dashboard.jab_ebilanz_cert_path")}</label>
+                      <ElsterTip lines={t("dashboard.jab_ebilanz_cert_why", { returnObjects: true }) as string[]} />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <input
+                        ref={certFileRef}
+                        type="file"
+                        accept=".pfx,.p12"
+                        className="hidden"
+                        onChange={e => {
+                          const f = e.target.files?.[0] ?? null;
+                          setCertFile(f);
+                          if (f) uploadCert(f);
+                        }}
+                      />
+                      {certSaved && !certFile ? (
+                        <>
+                          <span className="text-[9px] font-mono text-green-700 flex items-center gap-0.5">
+                            <Icon icon="mdi:check-circle" className="w-3 h-3" />
+                            {t("dashboard.jab_ebilanz_cert_saved")}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => certFileRef.current?.click()}
+                            className="text-[9px] font-mono text-black/40 underline underline-offset-2 hover:text-black transition-colors"
+                          >
+                            {t("dashboard.jab_ebilanz_cert_replace")}
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => certFileRef.current?.click()}
+                            disabled={certUploading}
+                            className="shrink-0 text-[10px] font-black px-2 py-0.5 rounded border border-black/30 hover:border-black hover:bg-amber-50 disabled:opacity-50 transition-colors"
+                          >
+                            <span className="flex items-center gap-1">
+                              <Icon icon={certUploading ? "mdi:loading" : "mdi:paperclip"} className={`w-3 h-3${certUploading ? " animate-spin" : ""}`} />
+                              {t("dashboard.jab_ebilanz_cert_choose")}
+                            </span>
+                          </button>
+                          <span className="text-[9px] font-mono text-black/40 truncate">
+                            {certFile?.name ?? "–"}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* ③ PIN with eye toggle */}
+                  <div className="flex flex-col gap-0.5">
+                    <label className="text-[9px] font-mono text-black/60">{t("dashboard.jab_ebilanz_cert_password")}</label>
+                    <div className="flex items-center">
+                      <input
+                        type={showPin ? "text" : "password"}
+                        value={certPassword}
+                        onChange={e => { setCertPassword(e.target.value); setCertPinSaved(false); }}
+                        onBlur={e => { const v = e.target.value; if (v) { setCertPinSaved(true); saveSetting("cert_pin", v); } }}
+                        placeholder="PIN"
+                        className="min-w-0 flex-1 text-[10px] font-mono border border-black/30 rounded-l px-1.5 py-0.5 bg-white focus:outline-none focus:border-black"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPin(v => !v)}
+                        className="shrink-0 border border-l-0 border-black/30 rounded-r px-1.5 py-0.5 hover:bg-amber-50 transition-colors focus:outline-none"
+                        tabIndex={-1}
+                      >
+                        <Icon icon={showPin ? "mdi:eye-off" : "mdi:eye"} className="w-3 h-3 text-black" />
+                      </button>
+                    </div>
+                    {certPinSaved && (
+                      <span className="text-[8px] font-mono text-green-700 flex items-center gap-0.5">
+                        <Icon icon="mdi:check-circle" className="w-2.5 h-2.5" />{t("dashboard.jab_ebilanz_eric_saved")}
+                      </span>
+                    )}
+                  </div>
+
+                </div>
+
+                {/* Testmodus + action buttons */}
+                <div className="flex items-center gap-3 flex-wrap">
+                  <label
+                    className="flex items-center gap-1 text-[10px] font-mono cursor-pointer select-none"
+                    title={t("dashboard.jab_ebilanz_use_test_hint")}
+                  >
+                    <input type="checkbox" checked={useTest} onChange={e => setUseTest(e.target.checked)} className="accent-amber-500" />
+                    {t("dashboard.jab_ebilanz_use_test")}
+                  </label>
+                  <button
+                    onClick={() => callEricEndpoint(true)}
+                    disabled={validating || submitting}
+                    className="text-[10px] font-black px-3 py-1.5 rounded border-2 border-black bg-white text-black hover:bg-amber-400 disabled:opacity-50 transition-colors"
+                  >
+                    {validating
+                      ? "…"
+                      : <span className="flex items-center gap-1.5"><Icon icon="mdi:check-circle-outline" className="w-3.5 h-3.5" />{t("dashboard.jab_ebilanz_validate_btn")}</span>}
+                  </button>
+                  <button
+                    onClick={() => callEricEndpoint(false)}
+                    disabled={submitting || validating}
+                    className="text-[10px] font-black px-3 py-1.5 rounded border-2 border-black bg-black text-white hover:text-amber-400 disabled:opacity-50 transition-colors"
+                  >
+                    {submitting
+                      ? "…"
+                      : <span className="flex items-center gap-1.5"><Icon icon="mdi:send" className="w-3.5 h-3.5" />{t("dashboard.jab_ebilanz_submit")}</span>}
+                  </button>
+                </div>
+
+                {submitError && (
+                  <p className="text-[10px] font-mono text-red-700 font-bold">✗ {submitError}</p>
+                )}
+                {validateMsg && (
+                  <p className="text-[10px] font-mono text-green-700 font-bold">{validateMsg}</p>
+                )}
+                {transferticket && (
+                  <p className="text-[10px] font-mono text-green-700 font-bold">
+                    ✓ {t("dashboard.jab_ebilanz_ticket")}: {transferticket}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -766,26 +1095,38 @@ td:last-child{text-align:right;white-space:nowrap}
       {xbrlPreviewOpen && xbrlXml && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-          onClick={() => setXbrlPreviewOpen(false)}
         >
           <div
             className="relative bg-white border-2 border-black rounded w-[90vw] max-w-4xl h-[80vh] flex flex-col"
-            onClick={e => e.stopPropagation()}
           >
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-2 border-b-2 border-black bg-amber-50">
               <span className="text-xs font-black uppercase tracking-wider">
                 E-Bilanz XBRL · {year}
               </span>
-              <button
-                onClick={() => setXbrlPreviewOpen(false)}
-                className="text-[10px] font-black px-2 py-1 rounded border border-black hover:bg-black hover:text-white transition-colors"
-              >
-                ✕ schließen
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(xbrlXml).then(() => {
+                      setXbrlCopied(true);
+                      setTimeout(() => setXbrlCopied(false), 2000);
+                    });
+                  }}
+                  className="text-[10px] font-black px-2 py-1 rounded border border-black hover:bg-amber-100 transition-colors flex items-center gap-1"
+                >
+                  <Icon icon={xbrlCopied ? "mdi:check" : "mdi:content-copy"} className="w-3 h-3" />
+                  {xbrlCopied ? "Kopiert" : "Kopieren"}
+                </button>
+                <button
+                  onClick={() => setXbrlPreviewOpen(false)}
+                  className="text-[10px] font-black px-2 py-1 rounded border border-black hover:bg-black hover:text-white transition-colors"
+                >
+                  ✕ schließen
+                </button>
+              </div>
             </div>
             {/* Body */}
-            <pre className="flex-1 overflow-auto p-4 text-[10px] font-mono text-black leading-relaxed whitespace-pre">
+            <pre className="flex-1 overflow-auto p-4 text-[10px] font-mono text-black leading-relaxed whitespace-pre select-all">
               {xbrlXml}
             </pre>
           </div>
