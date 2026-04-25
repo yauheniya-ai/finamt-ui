@@ -345,7 +345,7 @@ td:last-child{text-align:right;white-space:nowrap}
 
   const fE = (n: number) =>
     n.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
-  const negFmt = (n: number) => (n < 0 ? `(${fE(Math.abs(n))})` : fE(n));
+  const negFmt = (n: number) => (n < 0 ? `−${fE(Math.abs(n))}` : fE(n));
 
   const ausstehend = r2(stammkapital - eingezahlt);
   const isGründungsjahr = year === gründungsjahr;
@@ -479,8 +479,7 @@ td:last-child{text-align:right;white-space:nowrap}
                 </tr>
                 <tr className="border-t-2 border-amber-300">
                   <td className="py-2 pl-2 font-black text-black text-sm">= {t("dashboard.jab_jahresergebnis")}</td>
-                  <td className={`py-2 text-right font-black text-sm ${
-                    guv.jahresergebnis >= 0 ? "text-black" : "text-red-700"}`}>
+                  <td className="py-2 text-right font-black text-sm text-black">
                     {negFmt(guv.jahresergebnis)}
                   </td>
                 </tr>
@@ -546,19 +545,19 @@ td:last-child{text-align:right;white-space:nowrap}
                     {s.nettomethode && bilanz.nichtEingefordert > 0 && (
                       <tr className="border-b border-amber-100">
                         <td className="py-1 pl-3 text-black/70 italic">./. {t("dashboard.jab_nicht_eingefordert")}</td>
-                        <td className="py-1 text-right text-red-700">({fE(bilanz.nichtEingefordert)})</td>
+                        <td className="py-1 text-right text-black">−{fE(bilanz.nichtEingefordert)}</td>
                       </tr>
                     )}
                     <tr className="border-b border-amber-100">
                       <td className="py-1 pl-3 text-black/70">III. {t("dashboard.jab_jahresergebnis_passiva")}</td>
-                      <td className={`py-1 text-right ${bilanz.jahresergebnis < 0 ? "text-red-700" : ""}`}>
+                      <td className="py-1 text-right">
                         {negFmt(bilanz.jahresergebnis)}
                       </td>
                     </tr>
                     {bilanz.gewinnvortrag !== 0 && (
                       <tr className="border-b border-amber-100">
                         <td className="py-1 pl-3 text-black/70">IV. {t("dashboard.jab_gewinnvortrag")}</td>
-                        <td className={`py-1 text-right ${bilanz.gewinnvortrag < 0 ? "text-red-700" : ""}`}>
+                        <td className="py-1 text-right">
                           {negFmt(bilanz.gewinnvortrag)}
                         </td>
                       </tr>
@@ -568,7 +567,7 @@ td:last-child{text-align:right;white-space:nowrap}
                         <td className="py-1 text-black/70">
                           B. {t("dashboard.jab_steuerpositionen")}
                         </td>
-                        <td className={`py-1 text-right ${bilanz.steuerpositionen < 0 ? "text-red-700" : ""}`}>
+                        <td className="py-1 text-right">
                           {negFmt(bilanz.steuerpositionen)}
                         </td>
                       </tr>
