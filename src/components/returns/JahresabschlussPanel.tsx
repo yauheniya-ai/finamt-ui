@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
-import { IconChevronDown, IconFilePdf, IconPrint } from "../../constants/icons";
+import { IconChevronDown, IconFilePdf } from "../../constants/icons";
 import type { Receipt, PeriodFilter, TaxpayerProfile } from "../Sidebar";
 import { CASHFLOW_ONLY_CATS } from "../Sidebar";
 import { LawLink, ElsterTip } from "./shared";
@@ -167,15 +167,21 @@ export function JahresabschlussPanel({ allReceipts, period, taxpayer, onEditTaxp
   const [s, setS] = useState<JabSettings>({
     nettomethode: true,
   });
-  const [xbrlDownloading, setXbrlDownloading] = useState(false);
   const [xbrlError, setXbrlError] = useState<string | null>(null);
   const [xbrlXml, setXbrlXml] = useState<string | null>(null);
   const [xbrlPreviewOpen, setXbrlPreviewOpen] = useState(false);
   const [xbrlCopied, setXbrlCopied] = useState(false);
+  const [localLogo, setLocalLogo] = useState<string | null>(null);
+  const logoFileRef = useRef<HTMLInputElement>(null);
 
   const [bilanzPreviewOpen, setBilanzPreviewOpen] = useState(false);
   const [bilanzHtml, setBilanzHtml] = useState<string | null>(null);
+  const [pdfGenerating, setPdfGenerating] = useState(false);
   const bilanzIframeRef = useRef<HTMLIFrameElement>(null);
+
+  type Submission = { type: string; year: number; submitted_at: string; note?: string };
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [markSubmitting, setMarkSubmitting] = useState(false);
   // ERiC submit form
   const [ericHome, setEricHome]             = useState("");
   const [ericHomeSaved, setEricHomeSaved]   = useState(false);
@@ -224,7 +230,54 @@ export function JahresabschlussPanel({ allReceipts, period, taxpayer, onEditTaxp
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) { setCertSaved(d.stored); } })
       .catch(() => {});
+    fetch(`${apiBase}/submissions${qs}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.submissions) setSubmissions(d.submissions); })
+      .catch(() => {});
   }, [apiBase, dbPath]);
+
+  async function downloadBilanzPdf() {
+    const iframe = bilanzIframeRef.current;
+    if (!iframe?.contentDocument?.body) return;
+    setPdfGenerating(true);
+    try {
+      const { default: html2canvas } = await import("html2canvas");
+      const { default: jsPDF } = await import("jspdf");
+      const canvas = await html2canvas(iframe.contentDocument.body, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        width: 794,
+        windowWidth: 794,
+      });
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pdfW = pdf.internal.pageSize.getWidth();
+      const pdfH = (canvas.height * pdfW) / canvas.width;
+      pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, pdfW, pdfH);
+      pdf.save(`Bilanz_${year}_${(taxpayer?.name ?? "GmbH").replace(/\s+/g, "_")}.pdf`);
+    } finally {
+      setPdfGenerating(false);
+    }
+  }
+
+  async function markAsSubmitted() {
+    setMarkSubmitting(true);
+    const record: Submission = {
+      type: "bundesanzeiger",
+      year,
+      submitted_at: new Date().toISOString(),
+    };
+    const qs = dbPath ? `?db=${encodeURIComponent(dbPath)}` : "";
+    try {
+      const res = await fetch(`${apiBase}/submissions${qs}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(record),
+      });
+      if (res.ok) setSubmissions(prev => [...prev, record]);
+    } catch { /* ignore */ }
+    setMarkSubmitting(false);
+  }
 
   async function saveSetting(key: string, value: string) {
     const qs = dbPath ? `?db=${encodeURIComponent(dbPath)}` : "";
@@ -249,42 +302,6 @@ export function JahresabschlussPanel({ allReceipts, period, taxpayer, onEditTaxp
       });
       if (res.ok) setEricHomeSaved(true);
     } catch { /* ignore */ }
-  }
-
-  async function downloadXbrl() {
-    setXbrlDownloading(true);
-    setXbrlError(null);
-    try {
-      const qs = dbPath ? `?db=${encodeURIComponent(dbPath)}` : "";
-      const res = await fetch(`${apiBase}/tax/ebilanz/xbrl${qs}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          year,
-          steuernummer: taxpayer?.tax_number ?? "",
-          company_name: taxpayer?.name ?? "",
-          legal_form:   taxpayer?.rechtsform ?? "GmbH",
-          stammkapital: stammkapital,
-          eingezahltes_kapital: eingezahlt,
-          vortrag: bilanz.gewinnvortrag,
-          nettomethode: s.nettomethode,
-        }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: res.statusText }));
-        throw new Error(err.detail ?? res.statusText);
-      }
-      const blob = await res.blob();
-      const filename = `ebilanz_${year}.xbrl`;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url; a.download = filename; a.click();
-      URL.revokeObjectURL(url);
-    } catch (e: unknown) {
-      setXbrlError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setXbrlDownloading(false);
-    }
   }
 
   async function previewXbrl() {
@@ -417,6 +434,10 @@ export function JahresabschlussPanel({ allReceipts, period, taxpayer, onEditTaxp
       `<tr style="border-top:1.5pt solid black"><td style="font-weight:bold;padding-top:4pt">${label}</td><td style="text-align:right;font-weight:bold;padding-top:4pt">${val}</td></tr>`;
 
     const company = taxpayer?.name ?? "–";
+    const logo = localLogo ?? taxpayer?.logo ?? null;
+    const logoHtml = logo
+      ? `<div style="text-align:center;margin-bottom:10pt"><img src="${logo}" alt="" style="max-height:60pt;max-width:160pt;object-fit:contain" /></div>`
+      : "";
     const b = bilanz;
     const ausstehendeRow = !s.nettomethode && b.ausstehendeEinlagenAktiva > 0
       ? row("C. Ausstehende Einlagen auf das gezeichnete Kapital", eur(b.ausstehendeEinlagenAktiva), 0, true) : "";
@@ -438,8 +459,8 @@ body{font-family:'Courier New',monospace;font-size:9.5pt;color:#000;
   background:#fff;max-width:174mm;min-height:257mm;margin:16pt auto;padding:20mm 18mm;
   box-shadow:0 2px 16px rgba(0,0,0,.18)}
 .header{text-align:center;margin-bottom:18pt;border-bottom:1.5pt solid #000;padding-bottom:10pt}
+.header p{font-size:10pt;font-weight:bold}
 .header h1{font-size:13pt;font-weight:bold;margin-bottom:3pt}
-.header p{font-size:9.5pt}
 .subheader{font-size:8pt;color:#555;margin-top:4pt}
 .two-col{display:grid;grid-template-columns:1fr 1fr;gap:28pt;margin-top:14pt}
 .col-header{font-size:8pt;font-weight:bold;text-transform:uppercase;letter-spacing:.06em;margin-bottom:7pt}
@@ -452,8 +473,9 @@ td:last-child{text-align:right;white-space:nowrap}
 </style></head>
 <body>
 <div class="header">
-  <h1>Bilanz zum 31. Dezember ${year}</h1>
+  ${logoHtml}
   <p>${company}</p>
+  <h1>Bilanz zum 31. Dezember ${year}</h1>
   <p class="subheader">Kleinstkapitalgesellschaft · § 267a HGB · Aufgestellt gemäß §§ 242, 266 HGB</p>
 </div>
 <div class="two-col">
@@ -861,8 +883,8 @@ td:last-child{text-align:right;white-space:nowrap}
                       className="flex items-center gap-1 text-[10px] font-mono border border-black/20 rounded px-1.5 py-0.5 bg-white hover:border-black transition-colors focus:outline-none"
                     >
                       <span className="flex-1 whitespace-nowrap">{{
-                        "de-gaap-ci-2025-04-01": "Taxonomien vom 01.04.2025 (Taxonomie 6.9)",
-                        "de-gaap-ci-2024-04-01": "Taxonomien vom 01.04.2024 (Taxonomie 6.8)",
+                        "de-gaap-ci-2025-04-01": "Taxonomie 6.9 vom 01.04.2025",
+                        "de-gaap-ci-2024-04-01": "Taxonomie 6.8 vom 01.04.2024",
                       }[taxonomy] ?? taxonomy}</span>
                       <IconChevronDown className={`w-3 h-3 shrink-0 transition-transform ${showTaxDropdown ? "rotate-180" : ""}`} />
                     </button>
@@ -872,8 +894,8 @@ td:last-child{text-align:right;white-space:nowrap}
                         onMouseLeave={() => setShowTaxDropdown(false)}
                       >
                         {([
-                          { value: "de-gaap-ci-2025-04-01", label: "Taxonomien vom 01.04.2025 (Taxonomie 6.9)" },
-                          { value: "de-gaap-ci-2024-04-01", label: "Taxonomien vom 01.04.2024 (Taxonomie 6.8)" },
+                          { value: "de-gaap-ci-2025-04-01", label: "Taxonomie 6.9 vom 01.04.2025" },
+                          { value: "de-gaap-ci-2024-04-01", label: "Taxonomie 6.8 vom 01.04.2024" },
                         ] as { value: string; label: string }[]).map(opt => (
                           <li key={opt.value}>
                             <button
@@ -1081,12 +1103,62 @@ td:last-child{text-align:right;white-space:nowrap}
                 <li className="text-[10px] font-mono text-black leading-relaxed">
                   {t("dashboard.jab_bundesanzeiger_step3")}
                 </li>
-                <li className="text-[10px] font-mono text-black leading-relaxed">
-                  {t("dashboard.jab_bundesanzeiger_step4")}
-                </li>
               </ol>
 
-              {/* PDF button — sits after "Als PDF hochladen" step */}
+              {/* Logo upload — optional, appears on the generated PDF */}
+              <div className="flex items-center gap-2 py-1">
+                <input
+                  ref={logoFileRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = ev => {
+                      const dataUrl = ev.target?.result as string ?? null;
+                      setLocalLogo(dataUrl);
+                      if (dataUrl && taxpayer) {
+                        const qs = dbPath ? `?db=${encodeURIComponent(dbPath)}` : "";
+                        fetch(`${apiBase}/taxpayer${qs}`, {
+                          method: "PUT",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ ...taxpayer, logo: dataUrl }),
+                        }).catch(() => {});
+                      }
+                    };
+                    reader.readAsDataURL(file);
+                  }}
+                />
+                {(localLogo ?? taxpayer?.logo) ? (
+                  <>
+                    <img
+                      src={localLogo ?? taxpayer?.logo ?? ""}
+                      alt="Logo"
+                      className="h-8 max-w-[72px] object-contain border border-black/10 rounded p-0.5 bg-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => logoFileRef.current?.click()}
+                      className="text-[10px] font-mono text-black/40 underline underline-offset-2 hover:text-black transition-colors"
+                    >
+                      {t("sidebar.taxpayer_logo_change")}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => logoFileRef.current?.click()}
+                    className="text-[10px] font-black px-2 py-1 rounded border border-black/20 hover:border-black hover:bg-amber-50 transition-colors flex items-center gap-1.5"
+                  >
+                    <Icon icon="mdi:image-plus" className="w-3 h-3" />
+                    {t("sidebar.taxpayer_logo_upload")} <span className="font-normal text-black/40">({t("dashboard.jab_optional")})</span>
+                  </button>
+                )}
+              </div>
+
+              {/* PDF button — sits after logo prompt */}
               <div className="flex flex-col gap-1">
                 <button
                   onClick={generateBilanzPdf}
@@ -1097,7 +1169,10 @@ td:last-child{text-align:right;white-space:nowrap}
                 <p className="text-[10px] font-mono text-black/60">{t("dashboard.jab_bundesanzeiger_pdf_hint")}</p>
               </div>
 
-              <ol className="list-decimal list-inside flex flex-col gap-1" start={5}>
+              <ol className="list-decimal list-inside flex flex-col gap-1" start={4}>
+                <li className="text-[10px] font-mono text-black leading-relaxed">
+                  {t("dashboard.jab_bundesanzeiger_step4")}
+                </li>
                 <li className="text-[10px] font-mono text-black leading-relaxed font-bold">
                   {t("dashboard.jab_bundesanzeiger_step5", { year, deadline: year + 1 })}
                 </li>
@@ -1110,6 +1185,53 @@ td:last-child{text-align:right;white-space:nowrap}
               >
                 → www.bundesanzeiger.de
               </a>
+
+              {/* Submission tracking */}
+              <div className="flex flex-col gap-1.5 pt-2 border-t border-amber-200">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {submissions.filter(s => s.type === "bundesanzeiger" && s.year === year).length === 0 ? (
+                    <button
+                      type="button"
+                      onClick={markAsSubmitted}
+                      disabled={markSubmitting}
+                      className="text-[10px] font-black px-2.5 py-1 rounded border-2 border-green-700 text-green-800 hover:bg-green-50 disabled:opacity-50 transition-colors flex items-center gap-1.5"
+                    >
+                      <Icon icon={markSubmitting ? "mdi:loading" : "mdi:check-circle-outline"} className={`w-3 h-3 ${markSubmitting ? "animate-spin" : ""}`} />
+                      {t("dashboard.jab_mark_submitted")}
+                    </button>
+                  ) : (
+                    submissions
+                      .filter(s => s.type === "bundesanzeiger" && s.year === year)
+                      .slice(-1)
+                      .map((s, i) => (
+                        <span key={i} className="text-[9px] font-mono flex items-center gap-1 text-green-700">
+                          <Icon icon="mdi:check-circle" className="w-3 h-3" />
+                          {t("dashboard.jab_submitted_on", { date: new Date(s.submitted_at).toLocaleDateString("de-DE") })}
+                          <button
+                            type="button"
+                            onClick={markAsSubmitted}
+                            disabled={markSubmitting}
+                            className="ml-1 text-black/30 underline underline-offset-2 hover:text-black transition-colors text-[8px] disabled:opacity-50"
+                          >
+                            {t("dashboard.jab_mark_submitted_again")}
+                          </button>
+                        </span>
+                      ))
+                  )}
+                </div>
+                {submissions.filter(s => s.type === "bundesanzeiger" && s.year === year).length > 1 && (
+                  <details className="text-[8px] font-mono text-black/40">
+                    <summary className="cursor-pointer hover:text-black/60">{t("dashboard.jab_submission_history")}</summary>
+                    <ul className="mt-1 flex flex-col gap-0.5 pl-2">
+                      {submissions
+                        .filter(s => s.type === "bundesanzeiger" && s.year === year)
+                        .map((s, i) => (
+                          <li key={i}>{new Date(s.submitted_at).toLocaleString("de-DE")}</li>
+                        ))}
+                    </ul>
+                  </details>
+                )}
+              </div>
             </div>
           </div>
 
@@ -1134,15 +1256,15 @@ td:last-child{text-align:right;white-space:nowrap}
               </span>
               <div className="flex gap-2">
                 <button
-                  onClick={() => bilanzIframeRef.current?.contentWindow?.print()}
-                  className="text-[10px] font-black px-2 py-1 rounded border border-black bg-black text-white hover:text-amber-400 transition-colors"
+                  onClick={downloadBilanzPdf}
+                  disabled={pdfGenerating}
+                  className="text-[10px] font-black px-2 py-1 rounded border border-black bg-black text-white hover:text-amber-400 disabled:opacity-50 transition-colors"
                 >
                   <span className="flex items-center gap-1">
-                    <IconPrint className="w-3.5 h-3.5" />
-                    <span>{t("dashboard.jab_bilanz_print")}</span>
-                    <span className="opacity-50 mx-0.5">/</span>
-                    <IconFilePdf className="w-3 h-3" />
-                    <span>{t("dashboard.jab_bilanz_save")}</span>
+                    {pdfGenerating
+                      ? <Icon icon="mdi:loading" className="w-3.5 h-3.5 animate-spin" />
+                      : <IconFilePdf className="w-3.5 h-3.5" />}
+                    <span>{pdfGenerating ? t("dashboard.jab_bilanz_generating") : t("dashboard.jab_bilanz_save")}</span>
                   </span>
                 </button>
                 <button

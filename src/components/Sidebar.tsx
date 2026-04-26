@@ -48,6 +48,8 @@ export type TaxpayerProfile = {
   betriebsstaette_mehrere?:  boolean | null; // Z. 26 — Betriebsstätten in mehreren Gemeinden
   betriebsstaette_erstreckt?: boolean | null; // Z. 27 — erstreckt sich über mehrere Gemeinden
   betriebsstaette_verlegt?:  boolean | null; // Z. 28 — einzige Betriebsstätte verlegt
+  // Company logo — stored as base64 data URL
+  logo?: string | null;
 };
 
 export type ReceiptItem = {
@@ -200,6 +202,16 @@ export function TaxpayerModal({ initial, onSave, onClear, onClose }: {
     hebesatz:      initial?.hebesatz      != null ? String(initial.hebesatz)      : "",
   });
   const [companyOpen, setCompanyOpen] = useState(false);
+  const [logo, setLogo] = useState<string | null>(initial?.logo ?? null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+
+  function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => setLogo(ev.target?.result as string ?? null);
+    reader.readAsDataURL(file);
+  }
 
   const set = (key: keyof TaxpayerProfile) =>
     (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -224,6 +236,7 @@ export function TaxpayerModal({ initial, onSave, onClear, onClose }: {
       betriebsstaette_mehrere:   form.betriebsstaette_mehrere   ?? false,
       betriebsstaette_erstreckt: form.betriebsstaette_erstreckt ?? false,
       betriebsstaette_verlegt:   form.betriebsstaette_verlegt   ?? false,
+      logo: logo ?? null,
     });
   };
 
@@ -325,6 +338,40 @@ export function TaxpayerModal({ initial, onSave, onClear, onClose }: {
             />
           </button>
           {companyOpen && <>
+            {/* Company logo */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider">
+                {t("sidebar.taxpayer_logo")}
+              </label>
+              <input
+                ref={logoInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleLogoChange}
+              />
+              {logo ? (
+                <div className="flex items-center gap-2">
+                  <img src={logo} alt="Logo" className="h-10 max-w-[80px] object-contain border border-black/10 rounded p-0.5 bg-white" />
+                  <button type="button" onClick={() => logoInputRef.current?.click()} className="text-[10px] font-mono text-black/40 underline underline-offset-2 hover:text-black transition-colors">
+                    {t("sidebar.taxpayer_logo_change")}
+                  </button>
+                  <button type="button" onClick={() => setLogo(null)} className="text-[10px] font-mono text-red-400 underline underline-offset-2 hover:text-red-600 transition-colors">
+                    {t("sidebar.taxpayer_logo_remove")}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => logoInputRef.current?.click()}
+                  className="text-xs font-black px-2 py-1 rounded border border-black/20 hover:border-black hover:bg-amber-50 transition-colors text-left flex items-center gap-1.5 w-fit"
+                >
+                  <Icon icon="mdi:image-plus" className="w-3.5 h-3.5" />
+                  {t("sidebar.taxpayer_logo_upload")}
+                </button>
+              )}
+            </div>
+
             <div className="flex flex-col gap-1">
               <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider">
                 {t("sidebar.taxpayer_gegenstand")}
