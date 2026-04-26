@@ -4,14 +4,24 @@ import elsterLogo from "../../assets/elster.svg";
 // ---------------------------------------------------------------------------
 // ELSTER tip icon with tooltip
 // ---------------------------------------------------------------------------
-export function ElsterTip({ lines }: { lines: string[] }) {
+export function ElsterTip({ lines, link, linkLabel }: { lines: string[]; link?: string; linkLabel?: string }) {
   return (
     <span className="relative group inline-flex items-center align-middle ml-1">
       <img src={elsterLogo} alt="ELSTER" className="w-3 h-3 inline-block cursor-default opacity-70 group-hover:opacity-100 transition-opacity" />
-      <span className="pointer-events-none absolute bottom-full mb-1.5 left-0 w-72 bg-black text-white text-[10px] leading-relaxed font-normal normal-case tracking-normal px-2 py-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity z-30 whitespace-normal">
+      <span className="pointer-events-none group-hover:pointer-events-auto absolute bottom-full mb-1.5 left-0 w-72 bg-black text-white text-[10px] leading-relaxed font-normal normal-case tracking-normal px-2 py-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity z-30 whitespace-normal after:content-[''] after:absolute after:left-0 after:top-full after:w-full after:h-3">
         {lines.map((line, i) => (
           <span key={i}>{line}{i < lines.length - 1 && <br />}</span>
         ))}
+        {link && (
+          <a
+            href={link}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block mt-1 text-amber-300 underline hover:text-amber-200 transition-colors"
+          >
+            {linkLabel ?? link}
+          </a>
+        )}
       </span>
     </span>
   );

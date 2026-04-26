@@ -188,6 +188,8 @@ export function JahresabschlussPanel({ allReceipts, period, taxpayer, onEditTaxp
   const [certPinSaved, setCertPinSaved]     = useState(false);
   const [elsterId, setElsterId]             = useState("");
   const [herstellerId, setHerstellerId]     = useState("");
+  const [taxonomy, setTaxonomy]             = useState("de-gaap-ci-2025-04-01"); // 6.9 default
+  const [showTaxDropdown, setShowTaxDropdown] = useState(false);
   const [showPin, setShowPin]               = useState(false);
   const [useTest, setUseTest]               = useState(true);
   const [submitting, setSubmitting]         = useState(false);
@@ -757,65 +759,23 @@ td:last-child{text-align:right;white-space:nowrap}
             <p className="text-[10px] font-mono text-black/70">{t("dashboard.jab_filing_note")}</p>
 
             {/* E-Bilanz */}
-            <div className="bg-amber-50 border border-amber-400 rounded p-3 flex flex-col gap-2">
+            <div className="bg-amber-50 border border-amber-400 rounded p-3 flex flex-col gap-3">
+
+              {/* ── Header ─────────────────────────────────────────── */}
               <div className="flex items-baseline gap-2 flex-wrap">
                 <span className="text-xs font-black text-black">1 · {t("dashboard.jab_ebilanz_title")}</span>
                 <span className="text-[10px] font-mono text-black/60">
                   <LawLink law="§ 5b EStG" href="https://www.gesetze-im-internet.de/estg/__5b.html" />
                 </span>
-                <a
-                  href="https://www.esteuer.de/#finanzantrag"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title="HGB-Taxonomie"
-                  className="text-black/40 hover:text-amber-800 transition-colors leading-none"
-                >
-                  <Icon icon="mdi:information-outline" className="w-3.5 h-3.5" />
-                </a>
               </div>
               <p className="text-[10px] font-mono text-black/60 italic">{t("dashboard.jab_ebilanz_law")}</p>
 
-              {/* Step 1 */}
-              <p className="text-[10px] font-mono text-black leading-relaxed">
-                {t("dashboard.jab_ebilanz_step1")}
-              </p>
+              {/* ── Configuration block ─────────────────────────── */}
+              <div className="flex flex-col gap-2 bg-white border border-amber-200 rounded p-2.5">
 
-              {/* Download + Preview XBRL buttons — after step 1, before step 2 */}
-              <div className="flex flex-col gap-1">
-                <div className="flex gap-2">
-                  <button
-                    onClick={downloadXbrl}
-                    disabled={xbrlDownloading}
-                    className="text-[10px] font-black px-3 py-1.5 rounded border-2 border-black bg-black text-white hover:text-amber-400 disabled:opacity-50 transition-colors"
-                  >
-                    {xbrlDownloading
-                      ? "…"
-                      : <span className="flex items-center gap-1.5"><Icon icon="mdi:download" className="w-3.5 h-3.5" />{t("dashboard.jab_ebilanz_download")}</span>}
-                  </button>
-                  <button
-                    onClick={previewXbrl}
-                    className="text-[10px] font-black px-3 py-1.5 rounded border-2 border-black bg-white text-black hover:bg-amber-400 transition-colors"
-                  >
-                    <span className="flex items-center gap-1.5"><Icon icon="mdi:eye-outline" className="w-3.5 h-3.5" />{t("dashboard.jab_ebilanz_preview")}</span>
-                  </button>
-                </div>
-                <p className="text-[10px] font-mono text-black/60">{t("dashboard.jab_ebilanz_download_hint")}</p>
-                {xbrlError && (
-                  <p className="text-[10px] font-mono text-red-700 font-bold">✗ {xbrlError}</p>
-                )}
-              </div>
-
-              {/* Step 2 */}
-              <p className="text-[10px] font-mono text-black leading-relaxed">
-                {t("dashboard.jab_ebilanz_step2")}
-              </p>
-
-              {/* ERiC submit form */}
-              <div className="flex flex-col gap-1.5 mt-1">
-
-                {/* Steuernummer — read-only from taxpayer profile */}
+                {/* Steuernummer */}
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[9px] font-mono text-black/60 shrink-0">{t("dashboard.jab_ebilanz_steuernummer")}:</span>
+                  <span className="text-[9px] font-mono text-black/50 shrink-0 w-28">{t("dashboard.jab_ebilanz_steuernummer")}</span>
                   <span className="text-[10px] font-mono font-bold text-black">
                     {taxpayer?.tax_number || <span className="text-black/30 italic">–</span>}
                   </span>
@@ -832,63 +792,117 @@ td:last-child{text-align:right;white-space:nowrap}
                   )}
                 </div>
 
-                {/* ① ERiC library path — full-width row */}
+                {/* ERiC path */}
                 <div className="flex flex-col gap-0.5">
-                  <div className="flex items-center gap-0">
-                    <label className="text-[9px] font-mono text-black/60">{t("dashboard.jab_ebilanz_eric_home")}</label>
+                  <div className="flex items-center gap-1">
+                    <label className="text-[9px] font-mono text-black/50 w-28 shrink-0">{t("dashboard.jab_ebilanz_eric_home")}</label>
                     {ericHomeSaved && (
                       <>
-                        <span className="ml-1 text-[8px] font-mono text-green-700 flex items-center gap-0.5">
+                        <span className="text-[8px] font-mono text-green-700 flex items-center gap-0.5">
                           <Icon icon="mdi:check-circle" className="w-2.5 h-2.5" />
                           {t("dashboard.jab_ebilanz_eric_saved")}
                         </span>
                         <button
                           type="button"
                           onClick={() => { setEricHomeSaved(false); setTimeout(() => ericHomeInputRef.current?.focus(), 0); }}
-                          className="ml-1 text-[8px] font-mono text-black/40 underline underline-offset-2 hover:text-black transition-colors"
+                          className="text-[8px] font-mono text-black/40 underline underline-offset-2 hover:text-black transition-colors"
                         >
                           {t("dashboard.jab_ebilanz_eric_edit")}
                         </button>
                       </>
                     )}
-                    <ElsterTip lines={t("dashboard.jab_ebilanz_eric_why", { returnObjects: true }) as string[]} />
+                    <ElsterTip
+                      lines={t("dashboard.jab_ebilanz_eric_why", { returnObjects: true }) as string[]}
+                      link="https://www.elster.de/elsterweb/infoseite/entwickler"
+                      linkLabel="www.elster.de → Softwareprodukte → ERiC"
+                    />
                   </div>
-                  <input
-                    ref={ericHomeInputRef}
-                    type="text"
-                    value={ericHome}
-                    onChange={e => { setEricHome(e.target.value); setEricHomeSaved(false); }}
-                    onBlur={e => saveEricHome(e.target.value)}
-                    placeholder="/path/to/ERiC-.../lib"
-                    className="min-w-0 text-[10px] font-mono border border-black/20 rounded px-1.5 py-0.5 bg-white focus:outline-none focus:border-black placeholder:text-black/20"
-                  />
+                  {!ericHomeSaved && (
+                    <input
+                      ref={ericHomeInputRef}
+                      type="text"
+                      value={ericHome}
+                      onChange={e => { setEricHome(e.target.value); setEricHomeSaved(false); }}
+                      onBlur={e => saveEricHome(e.target.value)}
+                      placeholder="/path/to/ERiC-.../lib"
+                      className="min-w-0 text-[10px] font-mono border border-black/20 rounded px-1.5 py-0.5 bg-white focus:outline-none focus:border-black placeholder:text-black/20"
+                    />
+                  )}
+                  {ericHomeSaved && (
+                    <span className="text-[9px] font-mono text-black/40 truncate">{ericHome}</span>
+                  )}
                 </div>
 
-                {/* ① b Hersteller-ID */}
-                <div className="flex flex-col gap-0.5">
-                  <div className="flex items-center gap-0">
-                    <label className="text-[9px] font-mono text-black/60">{t("dashboard.jab_ebilanz_hersteller_id")}</label>
-                    <ElsterTip lines={t("dashboard.jab_ebilanz_hersteller_why", { returnObjects: true }) as string[]} />
-                  </div>
+                {/* Hersteller-ID */}
+                <div className="flex items-center gap-1">
+                  <label className="text-[9px] font-mono text-black/50 w-28 shrink-0">{t("dashboard.jab_ebilanz_hersteller_id")}</label>
                   <input
                     type="text"
                     value={herstellerId}
                     onChange={e => { setHerstellerId(e.target.value); }}
                     onBlur={e => { const v = e.target.value.trim(); if (v) saveSetting("hersteller_id", v); }}
                     placeholder="z. B. 12345"
-                    className="min-w-0 text-[10px] font-mono border border-black/20 rounded px-1.5 py-0.5 bg-white focus:outline-none focus:border-black placeholder:text-black/20"
+                    className="w-32 text-[10px] font-mono border border-black/20 rounded px-1.5 py-0.5 bg-white focus:outline-none focus:border-black placeholder:text-black/20"
+                  />
+                  <ElsterTip
+                    lines={t("dashboard.jab_ebilanz_hersteller_why", { returnObjects: true }) as string[]}
+                    link="https://www.elster.de/elsterweb/registrierung-entwickler/form"
+                    linkLabel="Registrierung als Softwarehersteller"
                   />
                 </div>
 
-                {/* ② Cert (.pfx) | ③ PIN — second row */}
-                <div className="grid grid-cols-2 gap-x-3 items-end">
+                {/* Taxonomy */}
+                <div className="flex items-center gap-1">
+                  <label className="text-[9px] font-mono text-black/50 w-28 shrink-0">{t("dashboard.jab_ebilanz_taxonomy")}</label>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setShowTaxDropdown(o => !o)}
+                      className="flex items-center gap-1 text-[10px] font-mono border border-black/20 rounded px-1.5 py-0.5 bg-white hover:border-black transition-colors focus:outline-none"
+                    >
+                      <span className="flex-1 whitespace-nowrap">{{
+                        "de-gaap-ci-2025-04-01": "Taxonomien vom 01.04.2025 (Taxonomie 6.9)",
+                        "de-gaap-ci-2024-04-01": "Taxonomien vom 01.04.2024 (Taxonomie 6.8)",
+                      }[taxonomy] ?? taxonomy}</span>
+                      <IconChevronDown className={`w-3 h-3 shrink-0 transition-transform ${showTaxDropdown ? "rotate-180" : ""}`} />
+                    </button>
+                    {showTaxDropdown && (
+                      <ul
+                        className="absolute z-30 mt-1 left-0 bg-white border border-amber-300 rounded shadow-lg"
+                        onMouseLeave={() => setShowTaxDropdown(false)}
+                      >
+                        {([
+                          { value: "de-gaap-ci-2025-04-01", label: "Taxonomien vom 01.04.2025 (Taxonomie 6.9)" },
+                          { value: "de-gaap-ci-2024-04-01", label: "Taxonomien vom 01.04.2024 (Taxonomie 6.8)" },
+                        ] as { value: string; label: string }[]).map(opt => (
+                          <li key={opt.value}>
+                            <button
+                              type="button"
+                              onClick={() => { setTaxonomy(opt.value); setShowTaxDropdown(false); }}
+                              className={`w-full text-left px-3 py-1.5 text-[10px] font-mono hover:bg-amber-50 transition-colors whitespace-nowrap ${
+                                opt.value === taxonomy ? "bg-amber-100 font-bold" : ""
+                              }`}
+                            >
+                              {opt.label}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                  <ElsterTip
+                    lines={[t("dashboard.jab_ebilanz_taxonomy_tip")]}
+                    link="https://www.esteuer.de/#finanzantrag"
+                    linkLabel="Mehr Informationen zu Taxonomien"
+                  />
+                </div>
 
-                  {/* ② Certificate .pfx */}
-                  <div className="flex flex-col gap-0.5">
-                    <div className="flex items-center gap-0">
-                      <label className="text-[9px] font-mono text-black/60">{t("dashboard.jab_ebilanz_cert_path")}</label>
-                      <ElsterTip lines={t("dashboard.jab_ebilanz_cert_why", { returnObjects: true }) as string[]} />
-                    </div>
+                {/* Cert + PIN */}
+                <div className="grid grid-cols-2 gap-x-3 items-center">
+
+                  {/* Certificate .pfx */}
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <label className="text-[9px] font-mono text-black/50 w-28 shrink-0">{t("dashboard.jab_ebilanz_cert_path")}</label>
                     <div className="flex items-center gap-1">
                       <input
                         ref={certFileRef}
@@ -934,12 +948,13 @@ td:last-child{text-align:right;white-space:nowrap}
                         </>
                       )}
                     </div>
+                    <ElsterTip lines={t("dashboard.jab_ebilanz_cert_why", { returnObjects: true }) as string[]} />
                   </div>
 
-                  {/* ③ PIN with eye toggle */}
-                  <div className="flex flex-col gap-0.5">
-                    <label className="text-[9px] font-mono text-black/60">{t("dashboard.jab_ebilanz_cert_password")}</label>
-                    <div className="flex items-center">
+                  {/* PIN */}
+                  <div className="flex items-center gap-1">
+                    <label className="text-[9px] font-mono text-black/50 shrink-0">{t("dashboard.jab_ebilanz_cert_password")}</label>
+                    <div className="flex items-center flex-1">
                       <input
                         type={showPin ? "text" : "password"}
                         value={certPassword}
@@ -956,18 +971,53 @@ td:last-child{text-align:right;white-space:nowrap}
                       >
                         <Icon icon={showPin ? "mdi:eye-off" : "mdi:eye"} className="w-3 h-3 text-black" />
                       </button>
+                      {certPinSaved && (
+                        <span className="ml-1 text-[8px] font-mono text-green-700 flex items-center gap-0.5">
+                          <Icon icon="mdi:check-circle" className="w-2.5 h-2.5" />{t("dashboard.jab_ebilanz_eric_saved")}
+                        </span>
+                      )}
                     </div>
-                    {certPinSaved && (
-                      <span className="text-[8px] font-mono text-green-700 flex items-center gap-0.5">
-                        <Icon icon="mdi:check-circle" className="w-2.5 h-2.5" />{t("dashboard.jab_ebilanz_eric_saved")}
-                      </span>
-                    )}
                   </div>
 
+                </div>{/* /cert+PIN grid */}
+
+              </div>{/* /config block */}
+
+              {/* ── Schritt 1 ───────────────────────────────────── */}
+              <div className="flex flex-col gap-1.5">
+                <p className="text-[10px] font-black uppercase tracking-wider text-black">
+                  {t("dashboard.jab_ebilanz_step1_title")}
+                </p>
+                <p className="text-[10px] font-mono text-black/70 leading-relaxed">
+                  {t("dashboard.jab_ebilanz_step1_desc")}
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={previewXbrl}
+                    className="text-[10px] font-black px-3 py-1.5 rounded border-2 border-black bg-white text-black hover:bg-amber-400 transition-colors"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <Icon icon="mdi:eye-outline" className="w-3.5 h-3.5" />
+                      {t("dashboard.jab_ebilanz_preview")}
+                    </span>
+                  </button>
                 </div>
+                {xbrlError && (
+                  <p className="text-[10px] font-mono text-red-700 font-bold">✗ {xbrlError}</p>
+                )}
+              </div>
+
+              {/* ── Schritt 2 ───────────────────────────────────── */}
+              <div className="flex flex-col gap-1.5">
+                <p className="text-[10px] font-black uppercase tracking-wider text-black">
+                  {t("dashboard.jab_ebilanz_step2_title")}
+                </p>
+                <p className="text-[10px] font-mono text-black/70 leading-relaxed">
+                  {t("dashboard.jab_ebilanz_step2_desc")}
+                </p>
 
                 {/* Testmodus + action buttons */}
-                <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-3 flex-wrap mt-0.5">
                   <label
                     className="flex items-center gap-1 text-[10px] font-mono cursor-pointer select-none"
                     title={t("dashboard.jab_ebilanz_use_test_hint")}
@@ -1007,6 +1057,7 @@ td:last-child{text-align:right;white-space:nowrap}
                   </p>
                 )}
               </div>
+
             </div>
 
             {/* Bundesanzeiger */}
@@ -1139,6 +1190,21 @@ td:last-child{text-align:right;white-space:nowrap}
                 >
                   <Icon icon={xbrlCopied ? "mdi:check" : "mdi:content-copy"} className="w-3 h-3" />
                   {xbrlCopied ? t("dashboard.jab_xbrl_copied") : t("dashboard.jab_xbrl_copy")}
+                </button>
+                <button
+                  onClick={() => {
+                    const blob = new Blob([xbrlXml], { type: "application/xml" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `elster_envelope_${year}.xml`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                  className="text-[10px] font-black px-2 py-1 rounded border border-black hover:bg-amber-100 transition-colors flex items-center gap-1"
+                >
+                  <Icon icon="mdi:download" className="w-3 h-3" />
+                  {t("dashboard.jab_xbrl_download")}
                 </button>
                 <button
                   onClick={() => setXbrlPreviewOpen(false)}

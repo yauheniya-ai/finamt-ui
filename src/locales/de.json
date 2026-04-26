@@ -654,28 +654,27 @@
     "jab_ebilanz_download": "XBRL herunterladen",
     "jab_ebilanz_preview": "XBRL-Vorschau",
     "jab_ebilanz_download_hint": "Erstellt E-Bilanz-XBRL aus den Werten dieses Panels",
+    "jab_ebilanz_eric_download_note": "ERiC-Bibliothek herunterladen (kostenlos, Registrierung erforderlich) von",
+    "jab_ebilanz_taxonomy": "Verwendete Taxonomie",
+    "jab_ebilanz_taxonomy_tip": "Die Taxonomie legt fest, welche Konten und Positionen im XBRL-Datensatz erlaubt sind. Das Bundesministerium der Finanzen gibt jährlich neue Versionen heraus.",
+    "jab_ebilanz_step1_title": "Schritt 1 — XBRL-Instanzdokument",
+    "jab_ebilanz_step1_desc": "finamt erstellt eine gültige MicroBilG-XBRL-Datei (§ 267a HGB) aus den Bilanz- und GuV-Werten dieses Panels.",
+    "jab_ebilanz_step2_title": "Schritt 2 — ERiC-Übermittlung",
+    "jab_ebilanz_step2_desc": "finamt ruft die ERiC-Bibliothek über ctypes auf und übermittelt die XBRL-Datei mit dem GmbH-.pfx-Zertifikat ans Finanzamt. Als Bestätigung erhältst du ein Transferticket.",
     "jab_ebilanz_steuernummer": "Steuernummer",
     "jab_ebilanz_edit_taxpayer": "Ergänzen",
     "jab_ebilanz_elster_id": "ELSTER-Steuernummer (13-stellig)",
     "jab_ebilanz_elster_id_hint": "optional — für XBRL-Kontext (z. B. 1137053950531)",
     "jab_ebilanz_eric_home": "ERiC-Bibliothekspfad",
     "jab_ebilanz_eric_why": [
-      "ERiC (ELSTER Rich Client) ist eine proprietäre C-Bibliothek des ELSTER-Projekts.",
-      "Sie darf aus Lizenzgründen nicht in finamt enthalten sein.",
-      "Jede:r Nutzer:in muss sie kostenlos (nach Registrierung) herunterladen:",
-      "www.elster.de → Softwareprodukte → ERiC",
-      "Vollständigen Pfad zum Ordner lib/ eintippen oder einfügen.",
-      "Der Pfad wird in ~/.finamt/{projekt}/ gespeichert und beim nächsten Start automatisch geladen."
+      "Proprietäre C-Bibliothek von ELSTER.",
+      "Kostenloser Download (Registrierung nötig):"
     ],
     "jab_ebilanz_eric_saved": "Gespeichert",
     "jab_ebilanz_eric_edit": "Bearbeiten",
     "jab_ebilanz_hersteller_id": "Hersteller-ID",
     "jab_ebilanz_hersteller_why": [
-      "Die Hersteller-ID weist Ihre Software bei ELSTER als autorisierte Übermittlungssoftware aus.",
-      "Sie erhalten sie nach Registrierung als Softwarehersteller auf dem ELSTER-Entwicklerportal:",
-      "www.elster.de/eportal/softwareentwickler",
-      "Nach dem Ausfüllen eines Antragsformulars wird die ID per E-Mail zugeschickt.",
-      "Ohne gültige Hersteller-ID lehnt ERiC die Übermittlung ab."
+      "ELSTER-Pflichtfeld: identifiziert Ihre Software als zugelassene Übermittlungssoftware."
     ],
     "jab_ebilanz_cert_path": "Zertifikat (.pfx)",
     "jab_ebilanz_cert_why": [
@@ -697,6 +696,7 @@
     "jab_xbrl_modal_title": "ELSTER-Umschlag · {{year}}",
     "jab_xbrl_copy": "Kopieren",
     "jab_xbrl_copied": "Kopiert",
+    "jab_xbrl_download": "Herunterladen",
     "jab_xbrl_close": "Schließen",
     "jab_bundesanzeiger_title": "Jahresabschluss → Bundesanzeiger",
     "jab_bundesanzeiger_law": "§ 325 + § 326 Abs. 2 HGB — Erleichterung für Kleinstkapitalgesellschaften: nur Bilanz einzureichen, keine GuV, kein Anhang",

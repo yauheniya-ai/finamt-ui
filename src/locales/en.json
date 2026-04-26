@@ -655,28 +655,28 @@
     "jab_ebilanz_alt": "ERiC download: www.elster.de → Softwareprodukte → ERiC (kostenlos nach Registrierung)",
     "jab_ebilanz_download": "Download XBRL",
     "jab_ebilanz_preview": "Preview XBRL",
-    "jab_ebilanz_download_hint": "Generates E-Bilanz XBRL from this panel’s figures",    "jab_ebilanz_steuernummer": "Tax number",
+    "jab_ebilanz_download_hint": "Generates E-Bilanz XBRL from this panel's figures",
+    "jab_ebilanz_eric_download_note": "Download ERiC library (free, registration required) from",
+    "jab_ebilanz_taxonomy": "Taxonomy",
+    "jab_ebilanz_taxonomy_tip": "The taxonomy defines which accounts and positions are permitted in the XBRL dataset. The Federal Ministry of Finance publishes new versions annually.",
+    "jab_ebilanz_step1_title": "Step 1 — XBRL instance document",
+    "jab_ebilanz_step1_desc": "finamt generates a valid MicroBilG XBRL file (§ 267a HGB) from the balance sheet and P&L figures in this panel.",
+    "jab_ebilanz_step2_title": "Step 2 — ERiC transmission",
+    "jab_ebilanz_step2_desc": "finamt calls the ERiC library via ctypes and transmits the XBRL file with your GmbH .pfx certificate to the Finanzamt. You receive a Transferticket as confirmation.",
+    "jab_ebilanz_steuernummer": "Tax number",
     "jab_ebilanz_edit_taxpayer": "Edit",
     "jab_ebilanz_elster_id": "ELSTER tax number (13-digit)",
     "jab_ebilanz_elster_id_hint": "optional — for XBRL context (e.g. 1137053950531)",
     "jab_ebilanz_eric_home": "ERiC library path",
     "jab_ebilanz_eric_why": [
-      "ERiC (ELSTER Rich Client) is a proprietary C library by the ELSTER project.",
-      "It cannot be bundled with finamt due to its license.",
-      "Each user must download it for free (registration required) from:",
-      "www.elster.de → Softwareprodukte → ERiC",
-      "Type or paste the full path to the lib/ folder here.",
-      "The path is saved to ~/.finamt/{project}/ and reloaded automatically on next start."
+      "Proprietary C library by ELSTER.",
+      "Free download (registration required):"
     ],
     "jab_ebilanz_eric_saved": "Saved",
     "jab_ebilanz_eric_edit": "Edit",
     "jab_ebilanz_hersteller_id": "Hersteller-ID (software publisher ID)",
     "jab_ebilanz_hersteller_why": [
-      "The Hersteller-ID identifies your software as an authorised ELSTER submission client.",
-      "You receive it after registering as a software publisher on the ELSTER developer portal:",
-      "www.elster.de/eportal/softwareentwickler",
-      "Fill in the registration form and the ID will be sent to you by e-mail.",
-      "ERiC will reject the submission if the ID is missing or invalid."
+      "Required by ELSTER: identifies your software as an authorised submission client."
     ],
     "jab_ebilanz_cert_path": "Certificate (.pfx)",
     "jab_ebilanz_cert_why": [
@@ -698,6 +698,7 @@
     "jab_xbrl_modal_title": "ELSTER envelope · {{year}}",
     "jab_xbrl_copy": "Copy",
     "jab_xbrl_copied": "Copied",
+    "jab_xbrl_download": "Download",
     "jab_xbrl_close": "Close",    "jab_bundesanzeiger_title": "Jahresabschluss → Bundesanzeiger",
     "jab_bundesanzeiger_law": "§ 325 + § 326 Abs. 2 HGB — Kleinstkapitalgesellschaft privilege: only Bilanz required, no GuV or Anhang",
     "jab_bundesanzeiger_pdf": "PDF generieren",
