@@ -289,23 +289,28 @@ export function JahresabschlussPanel({ allReceipts, period, taxpayer, onEditTaxp
     setXbrlError(null);
     try {
       const qs = dbPath ? `?db=${encodeURIComponent(dbPath)}` : "";
-      const res = await fetch(`${apiBase}/tax/ebilanz/xbrl${qs}`, {
+      const res = await fetch(`${apiBase}/tax/ebilanz/envelope${qs}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           year,
-          steuernummer: taxpayer?.tax_number ?? "",
-          company_name: taxpayer?.name ?? "",
-          legal_form:   taxpayer?.rechtsform ?? "GmbH",
-          stammkapital: stammkapital,
+          steuernummer:         taxpayer?.tax_number ?? "",
+          company_name:         taxpayer?.name ?? "",
+          legal_form:           taxpayer?.rechtsform ?? "GmbH",
+          stammkapital:         stammkapital,
           eingezahltes_kapital: eingezahlt,
-          vortrag: bilanz.gewinnvortrag,
-          nettomethode: s.nettomethode,
+          vortrag:              bilanz.gewinnvortrag,
+          nettomethode:         s.nettomethode,
+          hersteller_id:        herstellerId || undefined,
+          use_test:             useTest,
         }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ detail: res.statusText }));
-        throw new Error(err.detail ?? res.statusText);
+        const msg = Array.isArray(err.detail)
+          ? err.detail.map((e: { msg?: string }) => e.msg ?? JSON.stringify(e)).join("; ")
+          : (err.detail ?? res.statusText);
+        throw new Error(msg);
       }
       const text = await res.text();
       setXbrlXml(text);
@@ -1120,7 +1125,7 @@ td:last-child{text-align:right;white-space:nowrap}
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-2 border-b-2 border-black bg-amber-50">
               <span className="text-xs font-black uppercase tracking-wider">
-                E-Bilanz XBRL · {year}
+                {t("dashboard.jab_xbrl_modal_title", { year })}
               </span>
               <div className="flex items-center gap-2">
                 <button
@@ -1133,13 +1138,13 @@ td:last-child{text-align:right;white-space:nowrap}
                   className="text-[10px] font-black px-2 py-1 rounded border border-black hover:bg-amber-100 transition-colors flex items-center gap-1"
                 >
                   <Icon icon={xbrlCopied ? "mdi:check" : "mdi:content-copy"} className="w-3 h-3" />
-                  {xbrlCopied ? "Kopiert" : "Kopieren"}
+                  {xbrlCopied ? t("dashboard.jab_xbrl_copied") : t("dashboard.jab_xbrl_copy")}
                 </button>
                 <button
                   onClick={() => setXbrlPreviewOpen(false)}
                   className="text-[10px] font-black px-2 py-1 rounded border border-black hover:bg-black hover:text-white transition-colors"
                 >
-                  ✕ Schließen
+                  {t("dashboard.jab_xbrl_close")}
                 </button>
               </div>
             </div>
