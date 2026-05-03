@@ -716,7 +716,7 @@
     "jab_bilanz_print": "Print",
     "jab_bilanz_save": "Save PDF",
     "jab_bundesanzeiger_step1": "Go to www.bundesanzeiger.de → Einreichungen → Jahresabschluss einreichen",
-    "jab_bundesanzeiger_step2": "Log in or register a company (Unternehmens-) account",
+    "jab_bundesanzeiger_step2": "Log in or register a company account → paid identity verification required",
     "jab_bundesanzeiger_step3": "Privilege for Kleinstkapitalgesellschaft (§ 267a HGB): only the Bilanz is required — no GuV, no Anhang (§ 326 Abs. 2 HGB)",
     "jab_bundesanzeiger_step4": "Upload as PDF or use the guided online form; no auditor signature required",
     "jab_bundesanzeiger_step5": "Deadline: 12 months after balance sheet date (e.g. FY {{year}} → 31 Dec {{deadline}}, § 325 Abs. 1a HGB)"

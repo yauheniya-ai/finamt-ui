@@ -339,6 +339,46 @@ export function JahresabschlussPanel({ allReceipts, period, taxpayer, onEditTaxp
     }
   }
 
+  async function downloadXbrlFile() {
+    setXbrlError(null);
+    try {
+      const qs = dbPath ? `?db=${encodeURIComponent(dbPath)}` : "";
+      const res = await fetch(`${apiBase}/tax/ebilanz/envelope${qs}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          year,
+          steuernummer:         taxpayer?.tax_number ?? "",
+          company_name:         taxpayer?.name ?? "",
+          legal_form:           taxpayer?.rechtsform ?? "GmbH",
+          stammkapital:         stammkapital,
+          eingezahltes_kapital: eingezahlt,
+          vortrag:              bilanz.gewinnvortrag,
+          nettomethode:         s.nettomethode,
+          hersteller_id:        herstellerId || undefined,
+          use_test:             useTest,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        const msg = Array.isArray(err.detail)
+          ? err.detail.map((e: { msg?: string }) => e.msg ?? JSON.stringify(e)).join("; ")
+          : (err.detail ?? res.statusText);
+        throw new Error(msg);
+      }
+      const text = await res.text();
+      const blob = new Blob([text], { type: "application/xml" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Bilanz_${year}_${(taxpayer?.name ?? "GmbH").replace(/\s+/g, "_")}.xml`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e: unknown) {
+      setXbrlError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   async function uploadCert(file: File) {
     setCertUploading(true);
     try {
@@ -431,7 +471,7 @@ export function JahresabschlussPanel({ allReceipts, period, taxpayer, onEditTaxp
       return `<tr><td style="${pad};${w}">${label}</td><td style="text-align:right;${w}">${val}</td></tr>`;
     };
     const totalRow = (label: string, val: string) =>
-      `<tr style="border-top:1.5pt solid black"><td style="font-weight:bold;padding-top:4pt">${label}</td><td style="text-align:right;font-weight:bold;padding-top:4pt">${val}</td></tr>`;
+      `<tr><td colspan="2" style="padding:0;height:1.5pt;background:#000"></td></tr><tr><td style="font-weight:bold;padding-top:5pt">${label}</td><td style="text-align:right;font-weight:bold;padding-top:5pt">${val}</td></tr>`;
 
     const company = taxpayer?.name ?? "–";
     const logo = localLogo ?? taxpayer?.logo ?? null;
@@ -465,7 +505,7 @@ body{font-family:'Courier New',monospace;font-size:9.5pt;color:#000;
 .two-col{display:grid;grid-template-columns:1fr 1fr;gap:28pt;margin-top:14pt}
 .col-header{font-size:8pt;font-weight:bold;text-transform:uppercase;letter-spacing:.06em;margin-bottom:7pt}
 table{width:100%;border-collapse:collapse}
-td{padding:2.2pt 0;border-bottom:.4pt solid #ddd;vertical-align:top}
+td{padding:3pt 0 4pt 0;vertical-align:top}
 td:last-child{text-align:right;white-space:nowrap}
 .balance-check{margin-top:18pt;font-size:8pt;padding:6pt 8pt;border:1pt solid #000}
 .footnote{margin-top:22pt;font-size:7.5pt;color:#555}
@@ -497,7 +537,7 @@ td:last-child{text-align:right;white-space:nowrap}
       ${nichtEingRow}
       ${row("III. Jahresergebnis", neg(b.jahresergebnis), 1)}
       ${gwRow}
-      <tr><td></td><td style="text-align:right;border-top:.4pt solid #999">${neg(b.summeEigenkapital)}</td></tr>
+      <tr><td></td><td style="text-align:right;border-top:.5pt solid #999;padding-top:4pt">${neg(b.summeEigenkapital)}</td></tr>
       ${stRow}
       ${totalRow("Bilanzsumme Passiva", eur(b.summePassiva))}
     </tbody></table>
@@ -508,10 +548,29 @@ td:last-child{text-align:right;white-space:nowrap}
   Bilanzsumme Passiva: <strong>${eur(b.summePassiva)}</strong> &nbsp;| 
   ${b.ausgeglichen ? "✓ ausgeglichen" : `✗ Differenz: ${eur(Math.abs(b.differenz))}`}
 </div>
+<div style="margin-top:18pt;font-size:8.5pt;font-family:'Courier New',monospace">
+  <div style="font-weight:bold;text-transform:uppercase;letter-spacing:.05em;border-bottom:1pt solid #000;padding-bottom:3pt;margin-bottom:8pt">
+    Angaben unter der Bilanz (§ 267a Abs. 2 HGB)
+  </div>
+  <p style="margin-bottom:6pt">
+    Als Kleinstkapitalgesellschaft werden folgende Angaben anstelle eines Anhangs gemacht:
+  </p>
+  <p style="margin-bottom:4pt">
+    <strong>1. Haftungsverhältnisse (§§ 251, 268 Abs. 7 HGB):</strong><br/>
+    Es bestehen keine Haftungsverhältnisse (Verbindlichkeiten aus Bürgschaften, Wechsel- und Scheckverbindlichkeiten, Gewährleistungsverträge, Bestellobligo), die nicht in der Bilanz erscheinen.
+  </p>
+  <p style="margin-bottom:4pt">
+    <strong>2. Vorschüsse und Kredite an Organmitglieder (§ 285 Nr. 9 Buchst. c HGB):</strong><br/>
+    Es wurden keine Vorschüsse oder Kredite an Mitglieder des Geschäftsführungsorgans, eines Aufsichtsrats, eines Beirats oder einer ähnlichen Einrichtung gewährt; es bestehen diesbezüglich keine Haftungsverhältnisse.
+  </p>
+</div>
 <div class="footnote">
-  Erstellt mit <a href="https://pypi.org/project/finamt/" target="_blank"><strong>finamt</strong></a> · ${new Date().toLocaleDateString("de-DE")} ·
+  Erstellt mit <strong style="color:#000">finamt</strong> · ${new Date().toLocaleDateString("de-DE")} ·
   Einreichung beim Bundesanzeiger gemäß § 325 Abs. 1 HGB i.V.m. § 326 Abs. 2 HGB.
   Als Kleinstkapitalgesellschaft sind GuV und Anhang von der Offenlegungspflicht befreit.
+</div>
+<div style="margin-top:12pt;text-align:right;font-size:7.5pt;font-family:'Courier New',monospace;color:#999">
+  Seite 1 von 1
 </div>
 </body></html>`;
 
@@ -1095,13 +1154,12 @@ td:last-child{text-align:right;white-space:nowrap}
               <p className="text-[10px] font-mono text-black/60 italic">{t("dashboard.jab_bundesanzeiger_law")}</p>
               <ol className="list-decimal list-inside flex flex-col gap-1">
                 <li className="text-[10px] font-mono text-black leading-relaxed">
-                  {t("dashboard.jab_bundesanzeiger_step1")}
+                  Aufrufen:{" "}
+                  <a href="https://publikations-plattform.de" target="_blank" rel="noopener noreferrer" className="underline underline-offset-1 hover:text-amber-800">publikations-plattform.de</a>
+                  {" → Jahresabschluss im Unternehmensregister hinterlegen"}
                 </li>
                 <li className="text-[10px] font-mono text-black leading-relaxed">
                   {t("dashboard.jab_bundesanzeiger_step2")}
-                </li>
-                <li className="text-[10px] font-mono text-black leading-relaxed">
-                  {t("dashboard.jab_bundesanzeiger_step3")}
                 </li>
               </ol>
 
@@ -1158,21 +1216,27 @@ td:last-child{text-align:right;white-space:nowrap}
                 )}
               </div>
 
-              {/* PDF button — sits after logo prompt */}
+              {/* PDF + XBRL buttons — sits after logo prompt */}
               <div className="flex flex-col gap-1">
-                <button
-                  onClick={generateBilanzPdf}
-                  className="self-start text-[10px] font-black px-3 py-1.5 rounded border-2 border-black bg-black text-white hover:text-amber-400 transition-colors"
-                >
-                  <span className="flex items-center gap-1.5"><Icon icon="fa7-solid:file-pdf" className="w-3.5 h-3.5" />{t("dashboard.jab_bundesanzeiger_pdf")}</span>
-                </button>
-                <p className="text-[10px] font-mono text-black/60">{t("dashboard.jab_bundesanzeiger_pdf_hint")}</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={generateBilanzPdf}
+                    className="text-[10px] font-black px-3 py-1.5 rounded border-2 border-black bg-black text-white hover:text-amber-400 transition-colors"
+                  >
+                    <span className="flex items-center gap-1.5"><Icon icon="fa7-solid:file-pdf" className="w-3.5 h-3.5" />{t("dashboard.jab_bundesanzeiger_pdf")}</span>
+                  </button>
+                  <button
+                    onClick={downloadXbrlFile}
+                    className="text-[10px] font-black px-3 py-1.5 rounded border-2 border-black bg-white text-black hover:bg-amber-400 transition-colors"
+                    title="Bevorzugtes Anlieferungsformat laut Bundesanzeiger"
+                  >
+                    <span className="flex items-center gap-1.5"><Icon icon="mdi:xml" className="w-3.5 h-3.5" />XBRL/XML herunterladen</span>
+                  </button>
+                </div>
+                <p className="text-[10px] font-mono text-amber-700 font-bold">↑ XBRL/XML ist das bevorzugte Anlieferungsformat (Format a) auf der Publikations-Plattform</p>
               </div>
 
-              <ol className="list-decimal list-inside flex flex-col gap-1" start={4}>
-                <li className="text-[10px] font-mono text-black leading-relaxed">
-                  {t("dashboard.jab_bundesanzeiger_step4")}
-                </li>
+              <ol className="list-decimal list-inside flex flex-col gap-1" start={3}>
                 <li className="text-[10px] font-mono text-black leading-relaxed font-bold">
                   {t("dashboard.jab_bundesanzeiger_step5", { year, deadline: year + 1 })}
                 </li>

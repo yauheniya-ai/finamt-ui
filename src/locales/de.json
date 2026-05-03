@@ -715,7 +715,7 @@
     "jab_bilanz_print": "Drucken",
     "jab_bilanz_save": "Speichern",
     "jab_bundesanzeiger_step1": "Aufrufen: www.bundesanzeiger.de → Einreichungen → Jahresabschluss einreichen",
-    "jab_bundesanzeiger_step2": "Mit Unternehmenskonto einloggen oder neu registrieren",
+    "jab_bundesanzeiger_step2": "Mit Unternehmenskonto einloggen oder neu registrieren → Kostenpflichtige Identifizierung notwendig",
     "jab_bundesanzeiger_step3": "Erleichterung für Kleinstkapitalgesellschaft (§ 267a HGB): nur die Bilanz ist einzureichen — keine GuV, kein Anhang erforderlich (§ 326 Abs. 2 HGB)",
     "jab_bundesanzeiger_step4": "Als PDF hochladen oder über das geführte Online-Formular einreichen; kein Testat erforderlich",
     "jab_bundesanzeiger_step5": "Frist: 12 Monate nach dem Bilanzstichtag (z. B. GJ {{year}} → 31. Dez. {{deadline}}, § 325 Abs. 1a HGB)"
