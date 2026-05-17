@@ -149,7 +149,7 @@ export default function DBSelector({ apiBase, activeDb, onSelect }: Props) {
       {/* Trigger button */}
       <button
         onClick={() => setOpen(true)}
-        className="flex items-center gap-1.5 text-xs font-bold font-mono text-black/60 hover:text-black transition-colors border border-black/10 rounded px-2 py-1 bg-white"
+        className="flex items-center gap-1.5 text-sm font-bold font-mono text-black/70 hover:text-black transition-colors border border-black/10 rounded px-2 py-1 bg-white"
         title={t("db.switch")}
       >
         <IconDatabase className="w-3.5 h-3.5" />

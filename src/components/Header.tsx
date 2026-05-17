@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import DBSelector, { type DBInfo } from "./DBSelector";
+import AgentConfigSelector from "./AgentConfigSelector";
 
 const INSTALL_CMD = "pip install finamt";
 
@@ -67,8 +68,13 @@ export default function Header({ apiBase, activeDb, onDbSelect, onLanguageChange
         </div>
       </div>
 
-      {/* Right — DB selector + DE/EN toggle */}
+      {/* Right — Agent config + DB selector + DE/EN toggle */}
       <div className="flex items-center gap-4 shrink-0 ml-6">
+
+        <AgentConfigSelector apiBase={apiBase} />
+
+        {/* Divider */}
+        <div className="w-px h-5 bg-black/15" />
 
         <DBSelector
           apiBase={apiBase}
