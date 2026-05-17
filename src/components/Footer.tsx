@@ -3,9 +3,9 @@ import { Icon } from "@iconify/react";
 export default function Footer() {
   return (
     <footer className="bg-amber-400 px-6 py-3 flex items-center justify-between shrink-0">
-      <div className="flex items-center gap-5 text-xs text-black/70">
-        
-        {/* Logo */}
+
+      {/* Left — logo + version */}
+      <div className="flex items-center gap-2 text-xs text-black/70">
         <span
           className="relative isolate inline-block font-mono text-white
                      before:absolute before:inset-0 before:bg-red-500
@@ -13,6 +13,11 @@ export default function Footer() {
         >
           finamt
         </span>
+        <span className="font-mono text-black/50">v{__APP_VERSION__}</span>
+      </div>
+
+      {/* Center — links */}
+      <div className="flex items-center gap-5 text-xs text-black/70">
 
         {/* PyPI */}
         <a
@@ -71,11 +76,11 @@ export default function Footer() {
 
       </div>
 
+      {/* Right — copyright */}
       <div className="text-xs text-black/70 font-mono">
-        <span>
-          v{__APP_VERSION__}
-        </span>
+        © {new Date().getFullYear()} Space Octahedron GmbH
       </div>
+
     </footer>
   );
 }
