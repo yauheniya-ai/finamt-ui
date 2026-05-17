@@ -5,7 +5,7 @@ import { readFileSync } from 'fs'
 import { resolve } from 'path'
 
 // Read version from pyproject.toml at build time
-const pyprojectContent = readFileSync(resolve(__dirname, '../pypi/pyproject.toml'), 'utf-8')
+const pyprojectContent = readFileSync(resolve(__dirname, '../finamt/pyproject.toml'), 'utf-8')
 const versionMatch = pyprojectContent.match(/^version\s*=\s*"(.+)"/m)
 const packageVersion = versionMatch ? versionMatch[1] : 'unknown'
 
@@ -13,7 +13,7 @@ const packageVersion = versionMatch ? versionMatch[1] : 'unknown'
 export default defineConfig({
   plugins: [react(), tailwindcss(), ],
   build: {
-    outDir: "../pypi/src/finamt/ui/static",
+    outDir: "../finamt/src/finamt/ui/static",
     emptyOutDir: true,
   },
   define: {

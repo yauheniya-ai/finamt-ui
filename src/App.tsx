@@ -234,6 +234,10 @@ export default function App() {
           period={period}
           taxpayer={taxpayer}
           onEditTaxpayer={() => setShowTaxpayerModal(true)}
+          onUpdateTaxpayer={(patch) => {
+            const base = taxpayer ?? { name: "", vat_id: "", tax_number: "", street: "", address_supplement: "", postcode: "", city: "", state: "", country: "" };
+            handleTaxpayerChange({ ...base, ...patch });
+          }}
           apiBase={API_BASE}
           dbPath={activeDb}
         />

@@ -50,6 +50,9 @@ export type TaxpayerProfile = {
   betriebsstaette_verlegt?:  boolean | null; // Z. 28 — einzige Betriebsstätte verlegt
   // Company logo — stored as base64 data URL
   logo?: string | null;
+  // Returns tracking
+  ustva_frequency?: "monthly" | "quarterly" | null;
+  starting_year?:   number | null;
 };
 
 export type ReceiptItem = {
@@ -193,6 +196,7 @@ export function TaxpayerModal({ initial, onSave, onClear, onClose }: {
     betriebsstaette_mehrere:   initial?.betriebsstaette_mehrere   ?? false,
     betriebsstaette_erstreckt: initial?.betriebsstaette_erstreckt ?? false,
     betriebsstaette_verlegt:   initial?.betriebsstaette_verlegt   ?? false,
+    ustva_frequency: initial?.ustva_frequency ?? null,
   });
   // String inputs for numeric fields (empty string ⇒ null)
   const [numForm, setNumForm] = useState({
@@ -200,6 +204,7 @@ export function TaxpayerModal({ initial, onSave, onClear, onClose }: {
     stammkapital:  initial?.stammkapital  != null ? String(initial.stammkapital)  : "",
     eingezahlt:    initial?.eingezahlt    != null ? String(initial.eingezahlt)    : "",
     hebesatz:      initial?.hebesatz      != null ? String(initial.hebesatz)      : "",
+    starting_year: initial?.starting_year != null ? String(initial.starting_year) : "",
   });
   const [companyOpen, setCompanyOpen] = useState(false);
   const [logo, setLogo] = useState<string | null>(initial?.logo ?? null);
@@ -227,15 +232,17 @@ export function TaxpayerModal({ initial, onSave, onClear, onClose }: {
     };
     onSave({
       ...form,
-      gründungsjahr: parse(numForm.gründungsjahr),
-      stammkapital:  parse(numForm.stammkapital),
-      eingezahlt:    parse(numForm.eingezahlt),
-      hebesatz:      parse(numForm.hebesatz),
-      gegenstand:    form.gegenstand || null,
-      rechtsform:    form.rechtsform || null,
+      gründungsjahr:   parse(numForm.gründungsjahr),
+      stammkapital:    parse(numForm.stammkapital),
+      eingezahlt:      parse(numForm.eingezahlt),
+      hebesatz:        parse(numForm.hebesatz),
+      starting_year:   parse(numForm.starting_year),
+      gegenstand:      form.gegenstand || null,
+      rechtsform:      form.rechtsform || null,
       betriebsstaette_mehrere:   form.betriebsstaette_mehrere   ?? false,
       betriebsstaette_erstreckt: form.betriebsstaette_erstreckt ?? false,
       betriebsstaette_verlegt:   form.betriebsstaette_verlegt   ?? false,
+      ustva_frequency: form.ustva_frequency ?? null,
       logo: logo ?? null,
     });
   };
@@ -440,6 +447,45 @@ export function TaxpayerModal({ initial, onSave, onClear, onClose }: {
                 max={2100}
               />
             </div>
+
+            {/* Returns tracking */}
+            <div className="flex flex-col gap-2 pt-1 border-t border-black/5">
+              <span className="text-[10px] text-black/40 font-bold uppercase tracking-wider">Steuererklärungen</span>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider">
+                  Erstes Jahr (falls kein Gründungsjahr)
+                </label>
+                <input
+                  type="number"
+                  value={numForm.starting_year}
+                  onChange={setNum("starting_year")}
+                  className="border border-black/20 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-amber-400"
+                  placeholder="2022"
+                  min={1990}
+                  max={2100}
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider">UStVA-Rhythmus</label>
+                <div className="flex gap-2">
+                  {(["monthly", "quarterly"] as const).map(f => (
+                    <button
+                      key={f}
+                      type="button"
+                      onClick={() => setForm(prev => ({ ...prev, ustva_frequency: prev.ustva_frequency === f ? null : f }))}
+                      className={`text-xs font-black px-3 py-0.5 rounded border-2 transition-colors ${
+                        form.ustva_frequency === f
+                          ? "bg-amber-400 border-amber-500 text-black"
+                          : "bg-white border-black/20 text-black/50"
+                      }`}
+                    >
+                      {f === "monthly" ? "Monatlich" : "Vierteljährlich"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
             <div className="flex flex-col gap-1">
               <label className="text-[10px] text-black/50 font-bold uppercase tracking-wider">
                 {t("sidebar.taxpayer_stammkapital_field")}

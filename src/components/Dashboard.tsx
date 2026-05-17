@@ -10,8 +10,9 @@ import { UStErkPanel } from "./returns/UStErkPanel";
 import { GewStPanel } from "./returns/GewStPanel";
 import { KStPanel } from "./returns/KStPanel";
 import { JahresabschlussPanel } from "./returns/JahresabschlussPanel";
+import { ReturnsOverview } from "./returns/ReturnsOverview";
 
-type Props = { receipts: Receipt[]; allReceipts: Receipt[]; period: PeriodFilter; taxpayer?: TaxpayerProfile | null; onEditTaxpayer?: () => void; apiBase?: string; dbPath?: string | null; };
+type Props = { receipts: Receipt[]; allReceipts: Receipt[]; period: PeriodFilter; taxpayer?: TaxpayerProfile | null; onEditTaxpayer?: () => void; onUpdateTaxpayer?: (patch: Partial<TaxpayerProfile>) => void; apiBase?: string; dbPath?: string | null; };
 
 // ---------------------------------------------------------------------------
 // Stat card
@@ -124,7 +125,7 @@ function CategoryChart({ title, totals, receipts }: {
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
-export default function Dashboard({ receipts, allReceipts, period, taxpayer, onEditTaxpayer, apiBase = "", dbPath }: Props) {
+export default function Dashboard({ receipts, allReceipts, period, taxpayer, onEditTaxpayer, onUpdateTaxpayer, apiBase = "", dbPath }: Props) {
   const { t } = useTranslation();
 
   // ── Period label ────────────────────────────────────────────────────────
@@ -235,6 +236,14 @@ export default function Dashboard({ receipts, allReceipts, period, taxpayer, onE
           </div>
         )}
       </div>
+
+      {/* STEUERERKLÄRUNGEN — ÜBERSICHT */}
+      <ReturnsOverview
+        taxpayer={taxpayer}
+        onUpdateTaxpayer={onUpdateTaxpayer}
+        apiBase={apiBase}
+        dbPath={dbPath}
+      />
 
       {/* UMSATZSTEUER-VORANMELDUNG */}
       <UStVAPanel receipts={receipts} period={period} />

@@ -442,8 +442,16 @@ export function JahresabschlussPanel({ allReceipts, period, taxpayer, onEditTaxp
       if (!res.ok || !data.success) {
         throw new Error(data.error_message ?? data.detail ?? res.statusText);
       }
-      if (isSend) setTransferticket(data.telenummer ?? "✓ OK");
-      else        setValidateMsg("✓ OK — XBRL valid");
+      if (isSend) {
+        setTransferticket(data.telenummer ?? "✓ OK");
+        // Persist ELSTER submission record so the Returns Overview can reflect it
+        const _qs = dbPath ? `?db=${encodeURIComponent(dbPath)}` : "";
+        const _rec: Submission = { type: "ebilanz", year, submitted_at: new Date().toISOString() };
+        fetch(`${apiBase}/submissions${_qs}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(_rec) }).catch(() => {});
+        setSubmissions(prev => [...prev, _rec]);
+      } else {
+        setValidateMsg("✓ OK — XBRL valid");
+      }
     } catch (e: unknown) {
       setSubmitError(e instanceof Error ? e.message : String(e));
     } finally {
