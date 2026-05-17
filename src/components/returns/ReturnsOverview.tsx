@@ -31,6 +31,10 @@ export function ReturnsOverview({ taxpayer, onUpdateTaxpayer, apiBase = "", dbPa
   const [saving,      setSaving]      = useState<string | null>(null);
   const [localStart,  setLocalStart]  = useState("");
 
+  // Confirmation dialog state
+  type ConfirmState = { action: "add" | "remove"; type: string; year: number; label: string };
+  const [confirm, setConfirm] = useState<ConfirmState | null>(null);
+
   // Derive starting year: prefer gründungsjahr, fallback to starting_year
   const startYear  = taxpayer?.gründungsjahr ?? taxpayer?.starting_year ?? null;
   const ustvFreq   = taxpayer?.ustva_frequency ?? null;
@@ -53,20 +57,44 @@ export function ReturnsOverview({ taxpayer, onUpdateTaxpayer, apiBase = "", dbPa
     return submissions.some(s => s.type === type && s.year === year);
   }
 
-  async function markSubmitted(type: string, year: number) {
-    if (isSubmitted(type, year)) return; // append-only — no delete
-    const key = `${type}|${year}`;
-    setSaving(key);
-    const record: Submission = { type, year, submitted_at: new Date().toISOString() };
+  function requestAdd(type: string, year: number, label: string) {
+    if (isSubmitted(type, year)) return;
+    setConfirm({ action: "add", type, year, label });
+  }
+
+  function requestRemove(type: string, year: number, label: string) {
+    setConfirm({ action: "remove", type, year, label });
+  }
+
+  async function executeConfirm(yes: boolean) {
+    if (!confirm) return;
+    const { action, type, year } = confirm;
+    setConfirm(null);
+    if (!yes) return;
+
+    const sk = `${type}|${year}`;
+    setSaving(sk);
     const qs = dbPath ? `?db=${encodeURIComponent(dbPath)}` : "";
-    try {
-      const res = await fetch(`${apiBase}/submissions${qs}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(record),
-      });
-      if (res.ok) setSubmissions(prev => [...prev, record]);
-    } catch { /* ignore */ }
+
+    if (action === "add") {
+      const record: Submission = { type, year, submitted_at: new Date().toISOString() };
+      try {
+        const res = await fetch(`${apiBase}/submissions${qs}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(record),
+        });
+        if (res.ok) setSubmissions(prev => [...prev, record]);
+      } catch { /* ignore */ }
+    } else {
+      try {
+        const res = await fetch(
+          `${apiBase}/submissions${qs ? qs + "&" : "?"}type=${encodeURIComponent(type)}&year=${year}`,
+          { method: "DELETE" },
+        );
+        if (res.ok) setSubmissions(prev => prev.filter(s => !(s.type === type && s.year === year)));
+      } catch { /* ignore */ }
+    }
     setSaving(null);
   }
 
@@ -88,20 +116,22 @@ export function ReturnsOverview({ taxpayer, onUpdateTaxpayer, apiBase = "", dbPa
 
   // ── Cell components ──────────────────────────────────────────────────────
 
-  function AnnualCell({ type, year }: { type: string; year: number }) {
+  function AnnualCell({ type, year, abbr }: { type: string; year: number; abbr: string }) {
     const done    = isSubmitted(type, year);
     const sk      = `${type}|${year}`;
     const loading = saving === sk;
+    const submittedAt = submissions.find(s => s.type === type && s.year === year)?.submitted_at;
+    const label = `${abbr} ${year}`;
     return (
       <button
-        onClick={() => markSubmitted(type, year)}
-        disabled={done || loading}
+        onClick={() => done ? requestRemove(type, year, label) : requestAdd(type, year, label)}
+        disabled={loading}
         title={done
-          ? `${type} ${year} — eingereicht am ${submissions.find(s => s.type === type && s.year === year)?.submitted_at ? new Date(submissions.find(s => s.type === type && s.year === year)!.submitted_at).toLocaleDateString("de-DE") : "?"}`
-          : `${type} ${year} als eingereicht markieren`}
+          ? `${label} — eingereicht am ${submittedAt ? new Date(submittedAt).toLocaleDateString("de-DE") : "?"}. Klicken zum Entfernen.`
+          : `${label} als eingereicht markieren`}
         className={`w-8 h-8 mx-auto rounded border-2 flex items-center justify-center text-sm font-black transition-colors ${
           done
-            ? "bg-amber-400 border-amber-500 text-black cursor-default"
+            ? "bg-amber-400 border-amber-500 text-black hover:bg-red-100 hover:border-red-400 cursor-pointer"
             : loading
             ? "bg-amber-50 border-amber-300 text-amber-400 cursor-wait"
             : "bg-white border-amber-200 text-black/20 hover:border-amber-500 hover:text-black/50 cursor-pointer"
@@ -122,12 +152,12 @@ export function ReturnsOverview({ taxpayer, onUpdateTaxpayer, apiBase = "", dbPa
           return (
             <button
               key={p.key}
-              onClick={() => markSubmitted(p.key, year)}
-              disabled={done || loading}
-              title={`${p.label} ${year} — ${done ? "eingereicht" : "als eingereicht markieren"}`}
+              onClick={() => done ? requestRemove(p.key, year, `${p.label} ${year}`) : requestAdd(p.key, year, `${p.label} ${year}`)}
+              disabled={loading}
+              title={`${p.label} ${year} — ${done ? "eingereicht. Klicken zum Entfernen." : "als eingereicht markieren"}`}
               className={`text-[9px] font-black px-1 py-0.5 rounded border transition-colors leading-none ${
                 done
-                  ? "bg-amber-400 border-amber-500 text-black cursor-default"
+                  ? "bg-amber-400 border-amber-500 text-black hover:bg-red-100 hover:border-red-400 cursor-pointer"
                   : loading
                   ? "bg-amber-50 border-amber-300 text-amber-400 cursor-wait"
                   : "bg-white border-amber-200 text-black/25 hover:border-amber-500 hover:text-black cursor-pointer"
@@ -144,6 +174,43 @@ export function ReturnsOverview({ taxpayer, onUpdateTaxpayer, apiBase = "", dbPa
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="bg-white border-2 border-amber-400 rounded">
+
+      {/* Confirmation dialog */}
+      {confirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onClick={() => executeConfirm(false)}
+        >
+          <div
+            className="bg-white border-2 border-amber-400 rounded p-5 w-72 flex flex-col gap-4 shadow-xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <p className="text-sm font-black text-black">
+              {confirm.action === "add"
+                ? <>Haben Sie diese Erklärung eingereicht?<br /><span className="font-mono text-xs text-black/60 font-normal">{confirm.label}</span></>
+                : <>Eintrag entfernen?<br /><span className="font-mono text-xs text-black/60 font-normal">{confirm.label}</span></>}
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => executeConfirm(false)}
+                className="px-4 py-1.5 text-xs font-black rounded border-2 border-black/20 bg-white text-black/60 hover:border-black/40 transition-colors"
+              >
+                Nein
+              </button>
+              <button
+                onClick={() => executeConfirm(true)}
+                className={`px-4 py-1.5 text-xs font-black rounded border-2 transition-colors ${
+                  confirm.action === "add"
+                    ? "bg-black border-black text-amber-400 hover:bg-black/80"
+                    : "bg-red-500 border-red-500 text-white hover:bg-red-600"
+                }`}
+              >
+                Ja
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Panel header */}
       <button
@@ -269,7 +336,7 @@ export function ReturnsOverview({ taxpayer, onUpdateTaxpayer, apiBase = "", dbPa
                       </td>
                       {years.map(y => (
                         <td key={y} className="px-3 py-1.5 border-l-2 border-amber-100 align-middle">
-                          <AnnualCell type={ret.key} year={y} />
+                          <AnnualCell type={ret.key} year={y} abbr={ret.abbr} />
                         </td>
                       ))}
                     </tr>
@@ -285,7 +352,7 @@ export function ReturnsOverview({ taxpayer, onUpdateTaxpayer, apiBase = "", dbPa
             <div className="flex items-center gap-4 pt-1 border-t border-amber-100">
               <div className="flex items-center gap-1.5">
                 <span className="w-5 h-5 rounded border-2 bg-amber-400 border-amber-500 text-black text-[9px] font-black flex items-center justify-center">✓</span>
-                <span className="text-[10px] text-black/50 font-mono">Eingereicht</span>
+                <span className="text-[10px] text-black/50 font-mono">Eingereicht — klicken zum Entfernen</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="w-5 h-5 rounded border-2 bg-white border-amber-200 text-black/20 text-[9px] font-black flex items-center justify-center">·</span>
